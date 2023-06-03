@@ -1,0 +1,69 @@
+package sakura
+
+import "github.com/sakura-internet/distributed-mariadb-controller/pkg/nftables"
+
+const (
+	MariaDBDaemonProcessPath = "/usr/sbin/mariadbd"
+)
+
+// triggerRunOnStateChangesToFault transition to fault state in main loop.
+// In fault state, the controller just reflect the fault state to external resources.
+func (c *SAKURAController) triggerRunOnStateChangesToFault() error {
+	// [STEP1]: START of configurating frrouting
+	if err := c.advertiseSelfNetIFAddress(); err != nil {
+		c.Logger.Warn("failed to advertise self-address in BGP but ignored because i'm fault", "error", err)
+	}
+	// [STEP1]: END of configurating frrouting
+
+	// [STEP2]: START of setting nftables state
+	if err := c.rejectTCP3306TrafficFromExternal(); err != nil {
+		c.Logger.Warn("failed to reject tcp traffic to 3306 but ignored because i'm fault", "error", err)
+	}
+	// [STEP2]: END of setting nftables state
+
+	// [STEP3]: START of setting MariaDB state
+	if err := c.processControlConnector.KillProcessWithFullName(MariaDBDaemonProcessPath); err != nil {
+		c.Logger.Warn("failed to kill mariadb daemon process but ignored because i'm fault", "error", err)
+	}
+	if err := c.stopMariaDBService(); err != nil {
+		c.Logger.Warn("failed to stop systemd mariadb process but ignored because i'm fault", "error", err)
+	}
+	// [STEP3]: END of setting MariaDB state
+
+	c.Logger.Info("fault state handler succeed")
+	return nil
+}
+
+// rejectTCP3306TrafficFromExternal sets the reject rule that denies the inbound communication from the outsider of the network.
+func (c *SAKURAController) rejectTCP3306TrafficFromExternal() error {
+	if err := c.nftablesConnector.FlushChain(
+		nftables.BuiltinTableFilter,
+		nftablesMariaDBChain,
+	); err != nil {
+		return err
+	}
+
+	rejectMatches := []nftables.Match{
+		nftables.IFNameMatch(mariaDBServerDefaultIFName),
+		nftables.TCPDstPortMatch(mariaDBServerDefaultPort),
+	}
+	if err := c.nftablesConnector.AddRule(
+		nftables.BuiltinTableFilter,
+		nftablesMariaDBChain,
+		rejectMatches,
+		nftables.RejectStatement(),
+	); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// stopMariaDBService stops the mariadb's systemd service.
+func (c *SAKURAController) stopMariaDBService() error {
+	if err := c.systemdConnector.StopService(mariaDBSerivceName); err != nil {
+		return err
+	}
+
+	return nil
+}
