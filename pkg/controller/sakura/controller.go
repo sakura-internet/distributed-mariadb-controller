@@ -76,18 +76,24 @@ func (c *SAKURAController) GetState() controller.State {
 
 // MakeDecision implements controller.Controller
 func (c *SAKURAController) MakeDecision() controller.State {
-	if c.CurrentNeighbors.primaryNodeExists() {
-		return controller.StateReplica
-	}
-
-	if c.CurrentNeighbors.candidateNodeExists() || c.CurrentNeighbors.replicaNodeExists() {
-		slog.Info("another candidate or replica exists")
+	currentNeighbors := c.CurrentNeighbors
+	switch c.GetState() {
+	case controller.StateFault:
+		return makeDecisionOnFault(currentNeighbors)
+		/*
+			case StatePrimary:
+				return c.decisionNextStateOnPrimary(ns, mariaDBHealth)
+			case StateCandidate:
+				return c.decisionNextStateOnCandidate(ns, mariaDBHealth, readyToPrimaryJudge)
+			case StateReplica:
+				return c.decisionNextStateOnReplica(ns, mariaDBHealth)
+		*/
+	case controller.StateInitial:
+		// just initialized controller take this case.
 		return controller.StateFault
+	default:
+		panic("unreachable")
 	}
-
-	// the fault controller is ready to transition to candidate state
-	// because network reachability is ok and no one candidate is here.
-	return SAKURAControllerStateCandidate
 }
 
 // OnExit implements controller.Controller
@@ -102,7 +108,7 @@ func (c *SAKURAController) OnExit() error {
 
 // OnStateHandler implements controller.Controller
 func (c *SAKURAController) OnStateHandler(nextState controller.State) error {
-	if cannotTransitionTo(c.currentState, nextState) {
+	if cannotTransitionTo(c.GetState(), nextState) {
 		panic("unreachable controller state was picked")
 	}
 	c.SetState(nextState)
@@ -133,7 +139,7 @@ func (*SAKURAController) PreMakeDecisionHandler() error {
 
 // SetState sets the given state as the current state of the controller.
 func (c *SAKURAController) SetState(nextState controller.State) {
-	c.prevState = c.currentState
+	c.prevState = c.GetState()
 	{
 		c.m.Lock()
 		c.currentState = nextState
@@ -232,7 +238,7 @@ func (c *SAKURAController) advertiseSelfNetIFAddress() error {
 	if err != nil {
 		return err
 	}
-	return c.bgpdConnector.ConfigureRouteWithRouteMap(*selfAddr, string(c.currentState))
+	return c.bgpdConnector.ConfigureRouteWithRouteMap(*selfAddr, string(c.GetState()))
 }
 
 // forceTransitionToFault set state to fault and triggers fault handler

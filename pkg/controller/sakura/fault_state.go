@@ -1,10 +1,32 @@
 package sakura
 
-import "github.com/sakura-internet/distributed-mariadb-controller/pkg/nftables"
+import (
+	"github.com/sakura-internet/distributed-mariadb-controller/pkg/controller"
+	"github.com/sakura-internet/distributed-mariadb-controller/pkg/nftables"
+	"golang.org/x/exp/slog"
+)
 
 const (
 	MariaDBDaemonProcessPath = "/usr/sbin/mariadbd"
 )
+
+// makeDecisionOnFault determines the next state on fault state
+func makeDecisionOnFault(
+	currentNeighbors *NeighborSet,
+) controller.State {
+	if currentNeighbors.primaryNodeExists() {
+		return controller.StateReplica
+	}
+
+	if currentNeighbors.candidateNodeExists() || currentNeighbors.replicaNodeExists() {
+		slog.Info("another candidate or replica exists")
+		return controller.StateFault
+	}
+
+	// the fault controller is ready to transition to candidate state
+	// because network reachability is ok and no one candidate is here.
+	return SAKURAControllerStateCandidate
+}
 
 // triggerRunOnStateChangesToFault transition to fault state in main loop.
 // In fault state, the controller just reflect the fault state to external resources.
