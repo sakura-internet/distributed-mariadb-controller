@@ -28,6 +28,7 @@ controllerLoop:
 		case <-ticker.C:
 			if err := ctrler.PreMakeDecisionHandler(); err != nil {
 				logger.Error("controller.PreMakeDecisionHandler()", err, "state", ctrler.GetState())
+				continue
 			}
 
 			time.Sleep(time.Second * time.Duration(rand.Intn(2)+1))

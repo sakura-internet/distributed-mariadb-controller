@@ -2,10 +2,12 @@ package sakura
 
 import (
 	"net"
+	"os"
 	"sync"
 
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/controller"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/frrouting/vtysh"
+	"github.com/sakura-internet/distributed-mariadb-controller/pkg/mariadb"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/nftables"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/process"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/systemd"
@@ -52,6 +54,10 @@ type SAKURAController struct {
 	// CurrentNeighbors holds the current BGP neighbors of the dbserver.
 	// that discovered in each loop of the controller.
 	CurrentNeighbors *NeighborSet
+	// CurrentMariaDBHealth holds the most recent healthcheck's result.
+	CurrentMariaDBHealth MariaDBHealthCheckResult
+	// ReadyToPrimary
+	ReadyToPrimary ReadyToPrimaryJudge
 
 	// nftablesConnector communicates with FRRouting BGPd via vtysh.
 	nftablesConnector nftables.Connector
@@ -64,6 +70,8 @@ type SAKURAController struct {
 	processControlConnector process.ProcessControlConnector
 	// systemdConnector manages the systemd services.
 	systemdConnector systemd.Connector
+	// mariaDBConnector communicates with MariaDB via mysql-client.
+	mariaDBConnector mariadb.Connector
 }
 
 // GetState implements controller.Controller
@@ -77,14 +85,20 @@ func (c *SAKURAController) GetState() controller.State {
 // MakeDecision implements controller.Controller
 func (c *SAKURAController) MakeDecision() controller.State {
 	currentNeighbors := c.CurrentNeighbors
+	currentMariaDBHealth := c.CurrentMariaDBHealth
+	readyToPrimary := c.ReadyToPrimary
 	switch c.GetState() {
 	case controller.StateFault:
 		return makeDecisionOnFault(currentNeighbors)
+	case SAKURAControllerStateCandidate:
+		return makeDecisionOnCandidate(
+			c.Logger,
+			currentNeighbors,
+			currentMariaDBHealth,
+			readyToPrimary)
 		/*
 			case StatePrimary:
 				return c.decisionNextStateOnPrimary(ns, mariaDBHealth)
-			case StateCandidate:
-				return c.decisionNextStateOnCandidate(ns, mariaDBHealth, readyToPrimaryJudge)
 			case StateReplica:
 				return c.decisionNextStateOnReplica(ns, mariaDBHealth)
 		*/
@@ -133,7 +147,29 @@ func (c *SAKURAController) OnStateHandler(nextState controller.State) error {
 }
 
 // PreMakeDecisionHandler implements controller.Controller
-func (*SAKURAController) PreMakeDecisionHandler() error {
+func (c *SAKURAController) PreMakeDecisionHandler() error {
+	prevNeighbors := c.CurrentNeighbors
+	prefixes, err := c.collectStateCommunityRoutePrefixes()
+	if err != nil {
+		// we urgently transition to fault state
+		slog.Error("failed to collect BGP routes", err, "state", c.GetState())
+		c.forceTransitionToFault()
+
+		return nil
+	}
+
+	c.CurrentNeighbors = c.extractNeighborAddresses(prefixes)
+	// to avoiding unnecessary calculation, we checks the logger's level.
+	if c.Logger.Enabled(slog.LevelInfo) {
+
+		if prevNeighbors.Different(c.CurrentNeighbors) {
+			addrs := c.CurrentNeighbors.NeighborAddresses()
+			c.Logger.Info("neighbor set is updated", "addresses", addrs)
+		}
+	}
+
+	c.CurrentMariaDBHealth = c.checkMariaDBHealth()
+	c.ReadyToPrimary = c.readyToBePromotedToPrimary()
 	return nil
 }
 
@@ -192,11 +228,9 @@ func (c *SAKURAController) triggerRunOnStateChanges() error {
 			return err
 		}
 	case SAKURAControllerStateCandidate:
-		/*
-			if err := c.triggerRunOnStateChangesToCandidate(); err != nil {
-				return err
-			}
-		*/
+		if err := c.triggerRunOnStateChangesToCandidate(); err != nil {
+			return err
+		}
 	case controller.StateReplica:
 		/*
 			if err := c.triggerRunOnStateChangesToReplica(currentNeighbors); err != nil {
@@ -262,6 +296,173 @@ func (c *SAKURAController) getPreviousState() controller.State {
 	defer c.m.RUnlock()
 
 	return c.prevState
+}
+
+// MariaDBHealthCheckResult is the result of the mariadb's healthcheck
+type MariaDBHealthCheckResult uint
+
+const (
+	MariaDBHealthCheckResultOK MariaDBHealthCheckResult = iota
+	MariaDBHealthCheckResultNG
+)
+
+// checkMariaDBHealth checks whether the MariaDB server is healthy or not.
+func (c *SAKURAController) checkMariaDBHealth() MariaDBHealthCheckResult {
+	if err := c.systemdConnector.CheckServiceStatus(mariaDBSerivceName); err != nil {
+		c.Logger.Debug("'systemctl status mariadb' exit with returning error", "error", err)
+		return MariaDBHealthCheckResultNG
+	}
+
+	return MariaDBHealthCheckResultOK
+}
+
+// ReadyToPrimaryJudge is the result of the judgement to be promoted to primary state.
+type ReadyToPrimaryJudge uint
+
+const (
+	// ReadytoPrimaryJudgeOK is OK for being promoted to primary state
+	ReadytoPrimaryJudgeOK ReadyToPrimaryJudge = iota
+	// ReadytoPrimaryJudgeNG is NG for being promoted to primary state
+	ReadytoPrimaryJudgeNG
+)
+
+// readyToBePromotedToPrimary returns true when the controller satisfies the conditions to be promoted to primary state.
+func (c *SAKURAController) readyToBePromotedToPrimary() ReadyToPrimaryJudge {
+	status, err := c.mariaDBConnector.ShowReplicationStatus()
+	if err != nil {
+		slog.Debug("failed to show replication status", "error", err)
+		return ReadytoPrimaryJudgeNG
+	}
+
+	readMasterLogPos, ok := status[mariadb.ReplicationStatusReadMasterLogPos]
+	if !ok {
+		return ReadytoPrimaryJudgeOK
+	}
+
+	if readMasterLogPos == status[mariadb.ReplicationStatusExecMasterLogPos] &&
+		status[mariadb.ReplicationStatusMasterLogFile] == status[mariadb.ReplicationStatusRelayMasterLogFile] {
+		return ReadytoPrimaryJudgeOK
+	}
+
+	return ReadytoPrimaryJudgeNG
+}
+
+// CollectStateCommunityRoutePrefixes collects the BGP route-prefix that they have a community of a controller-state.
+func (c *SAKURAController) collectStateCommunityRoutePrefixes() (map[controller.State][]net.IP, error) {
+	routes := make(map[controller.State][]net.IP)
+
+	// StateInitial is not needed in the below slice because the state doesn't advertise any routes.
+	states := []controller.State{
+		SAKURAControllerStateCandidate,
+		controller.StateFault,
+		controller.StatePrimary,
+		controller.StateReplica,
+		SAKURAControllerStateAnchor,
+	}
+
+	for _, state := range states {
+		if routes[state] == nil {
+			routes[state] = make([]net.IP, 0)
+		}
+
+		bgp, err := c.bgpdConnector.ShowRoutesWithBGPCommunityList(string(state))
+		if err != nil {
+			return nil, err
+		}
+
+		for routePrefix := range bgp.Routes {
+			// NOTE: we recommend you use net/netip instead of net package
+			//       because the netip.Addr is the most prefered way to present an IP address in Go.
+			//       but the net/netip package doesn't have the way to parse CIDR notation.
+			addr, _, err := net.ParseCIDR(routePrefix)
+			if err != nil {
+				c.Logger.Error("failed to parse route prefix", err)
+			}
+
+			routes[state] = append(routes[state], addr)
+		}
+
+	}
+
+	return routes, nil
+}
+
+// ExtractNeighborAddresses get only the addresses of the neighbors from the given prefixes.
+func (c *SAKURAController) extractNeighborAddresses(
+	prefixMatrix map[controller.State][]net.IP,
+) *NeighborSet {
+	neighbors := NewNeighborSet()
+
+	for state, prefixes := range prefixMatrix {
+
+		for _, prefix := range prefixes {
+
+			// each prefix of the advertised BGP route is the unicast address of other DB instances.
+			// if the route prefix(unicast IP) and my address are same,
+			// the route is advertised from me so it should be ignored.
+			if prefix.String() == c.selfAddr {
+				continue
+			}
+
+			if neighbors.NeighborMatrix[state] == nil {
+				neighbors.NeighborMatrix[state] = make([]Neighbor, 0)
+			}
+
+			neighbors.NeighborMatrix[state] = append(
+				neighbors.NeighborMatrix[state],
+				Neighbor{
+					Address: prefix.String(),
+				},
+			)
+		}
+	}
+
+	return neighbors
+}
+
+// syncReadOnlyVariable updates the read_only variable to the given expected value.
+// if the current value equals the given value, the variable is already synced.
+// otherwise, the function tries to sync the variable.
+func (c *SAKURAController) syncReadOnlyVariable(readOnlyToBeTrue bool) error {
+	isOn := c.mariaDBConnector.CheckBoolVariableIsON(mariadb.ReadOnlyVariableName)
+
+	if readOnlyToBeTrue == isOn {
+		// the variable is already the expected value.
+		// nothing to do.
+		return nil
+	}
+
+	if readOnlyToBeTrue {
+		return c.mariaDBConnector.TurnOnBoolVariable(mariadb.ReadOnlyVariableName)
+	}
+
+	return c.mariaDBConnector.TurnOffBoolVariable(mariadb.ReadOnlyVariableName)
+}
+
+// startMariaDBService starts the mariadb service of systemd.
+func (c *SAKURAController) startMariaDBService() error {
+	const (
+		mysqlMasterInfoFilePath = "/var/lib/mysql/master.info"
+		mysqllRelayInfoFilePath = "/var/lib/mysql/relay-log.info"
+	)
+
+	preHook := func() error {
+		if err := os.RemoveAll(mysqlMasterInfoFilePath); err != nil {
+			return err
+		}
+
+		if err := os.RemoveAll(mysqllRelayInfoFilePath); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if err := c.systemdConnector.StartService(mariaDBSerivceName, preHook, nil); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // cannotTransitionTo checks whether the state machine doesn't have the edge from current to next.
