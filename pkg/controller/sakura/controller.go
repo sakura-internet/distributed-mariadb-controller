@@ -96,9 +96,9 @@ func (c *SAKURAController) MakeDecision() controller.State {
 			currentNeighbors,
 			currentMariaDBHealth,
 			readyToPrimary)
+	case controller.StatePrimary:
+		return makeDecisionNextStateOnPrimary(c.Logger, currentNeighbors, currentMariaDBHealth)
 		/*
-			case StatePrimary:
-				return c.decisionNextStateOnPrimary(ns, mariaDBHealth)
 			case StateReplica:
 				return c.decisionNextStateOnReplica(ns, mariaDBHealth)
 		*/
@@ -218,11 +218,9 @@ func NewSAKURAController(logger *slog.Logger, configs ...ControllerConfig) *SAKU
 func (c *SAKURAController) triggerRunOnStateChanges() error {
 	switch c.GetState() {
 	case controller.StatePrimary:
-		/*
-			if err := c.triggerRunOnStateChangesToPrimary(currentNeighbors); err != nil {
-				return err
-			}
-		*/
+		if err := c.triggerRunOnStateChangesToPrimary(currentNeighbors); err != nil {
+			return err
+		}
 	case controller.StateFault:
 		if err := c.triggerRunOnStateChangesToFault(); err != nil {
 			return err
