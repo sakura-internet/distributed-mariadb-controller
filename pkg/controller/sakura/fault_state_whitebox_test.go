@@ -1,11 +1,13 @@
 package sakura
 
 import (
+	"os"
 	"testing"
 
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/controller"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/systemd"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/exp/slog"
 )
 
 func TestTriggerRunOnStateChangesToFault_OKPath(t *testing.T) {
@@ -24,7 +26,8 @@ func TestDecideNextStateOnFault_WithPrimaryNeighbors(t *testing.T) {
 	ns := NewNeighborSet()
 	ns.NeighborMatrix[controller.StatePrimary] = append(ns.NeighborMatrix[controller.StatePrimary], Neighbor{})
 
-	nextState := decideNextStateOnFault(ns)
+	logger := slog.New(slog.NewJSONHandler(os.Stderr))
+	nextState := decideNextStateOnFault(logger, ns)
 	assert.Equal(t, controller.StateReplica, nextState)
 }
 
@@ -32,7 +35,8 @@ func TestDecideNextStateOnFault_WithCandidateNeighbors(t *testing.T) {
 	ns := NewNeighborSet()
 	ns.NeighborMatrix[SAKURAControllerStateCandidate] = append(ns.NeighborMatrix[SAKURAControllerStateCandidate], Neighbor{})
 
-	nextState := decideNextStateOnFault(ns)
+	logger := slog.New(slog.NewJSONHandler(os.Stderr))
+	nextState := decideNextStateOnFault(logger, ns)
 	assert.Equal(t, controller.StateFault, nextState)
 }
 
@@ -40,7 +44,8 @@ func TestDecideNextStateOnFault_WithReplicaNeighbors(t *testing.T) {
 	ns := NewNeighborSet()
 	ns.NeighborMatrix[controller.StateReplica] = append(ns.NeighborMatrix[controller.StateReplica], Neighbor{})
 
-	nextState := decideNextStateOnFault(ns)
+	logger := slog.New(slog.NewJSONHandler(os.Stderr))
+	nextState := decideNextStateOnFault(logger, ns)
 	assert.Equal(t, controller.StateFault, nextState)
 }
 
@@ -48,6 +53,7 @@ func TestDecideNextStateOnFault_WithoutNeighbors(t *testing.T) {
 	ns := NewNeighborSet()
 	ns.NeighborMatrix[controller.StateFault] = append(ns.NeighborMatrix[controller.StateFault], Neighbor{})
 
-	nextState := decideNextStateOnFault(ns)
+	logger := slog.New(slog.NewJSONHandler(os.Stderr))
+	nextState := decideNextStateOnFault(logger, ns)
 	assert.Equal(t, SAKURAControllerStateCandidate, nextState)
 }

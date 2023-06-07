@@ -60,6 +60,6 @@ func (c *SAKURAController) triggerRunOnStateChangesToCandidate() error {
 	}
 	// [STEP3]: END of configurating frrouting.
 
-	slog.Info("candidate state handler succeed")
+	c.Logger.Info("candidate state handler succeed")
 	return nil
 }

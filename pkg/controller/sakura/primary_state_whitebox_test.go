@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/controller"
+	"github.com/sakura-internet/distributed-mariadb-controller/pkg/mariadb"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/exp/slog"
 )
@@ -35,14 +36,12 @@ func TestDecideNextStateOnPrimary_OKPath(t *testing.T) {
 	assert.Equal(t, controller.StatePrimary, nextState)
 }
 
-/*
 func TestTriggerRunOnStateKeepsPrimary_WriteTestDataFailPath(t *testing.T) {
 	c := _newFakeSAKURAController()
 	// inject the mariadb connector that fails to write testdata.
-	c.mariaDBConnector = testhelper.NewFakeMariaDBFailWriteTestDataConnector()
+	c.mariaDBConnector = mariadb.NewFakeMariaDBFailWriteTestDataConnector()
 
-	ns := NewNeighborSet()
-	err := c.triggerRunOnStateKeepsPrimary(ns)
+	err := c.triggerRunOnStateKeepsPrimary()
 	assert.NoError(t, err)
 
 	// check the challenge count of writing test data is incremented.
@@ -50,13 +49,39 @@ func TestTriggerRunOnStateKeepsPrimary_WriteTestDataFailPath(t *testing.T) {
 }
 
 func TestTriggerRunOnStateKeepsPrimary_WriteTestDataFailedCountOversThreshold(t *testing.T) {
-	c := _newFakeController("10.0.0.1", "dummy-db-replica-password")
+	c := _newFakeSAKURAController()
 	// inject the mariadb connector that fails to write testdata.
-	c.mariadbConnector = testhelper.NewFakeMariaDBFailWriteTestDataConnector()
+	c.mariaDBConnector = mariadb.NewFakeMariaDBFailWriteTestDataConnector()
 	c.writeTestDataFailCount = writeTestDataFailCountThreshold
 
-	ns := NewNeighborSet()
-	err := c.triggerRunOnStateKeepsPrimary(ns)
+	err := c.triggerRunOnStateKeepsPrimary()
 	assert.Error(t, err)
 }
-*/
+
+func TestTriggerRunOnStateChangesToPrimary_OKPath(t *testing.T) {
+	c := _newFakeSAKURAController()
+
+	// for checking the triggerRunOnStateChangesToPrimary() resets this count to 0
+	c.writeTestDataFailCount = 5
+
+	err := c.triggerRunOnStateChangesToPrimary()
+	assert.NoError(t, err)
+	assert.Equal(t, uint(0), c.writeTestDataFailCount)
+
+	// test with MariaDB Connector
+	fakeMariaDBConn := c.mariaDBConnector.(*mariadb.FakeMariaDBConnector)
+	_, ok := fakeMariaDBConn.Timestamp["StopReplica"]
+	assert.True(t, ok)
+
+	t.Run("TestTriggerRunOnStateChangesToPrimary_OKPath_mustTurnOffMariaDBReadOnlyVariable", _mustTurnOffMariaDBReadOnlyVairable(fakeMariaDBConn))
+}
+
+func _mustTurnOffMariaDBReadOnlyVairable(conn *mariadb.FakeMariaDBConnector) func(t *testing.T) {
+	return func(t *testing.T) {
+		t.Parallel()
+
+		_, ok := conn.Timestamp["StopReplica"]
+		assert.True(t, ok)
+		assert.False(t, conn.ReadOnlyVariable)
+	}
+}

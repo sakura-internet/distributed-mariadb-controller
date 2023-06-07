@@ -25,4 +25,7 @@ const (
 	ReplicationStatusRelayMasterLogFile = "Relay_Master_Log_File"
 	ReplicationStatusMasterLogFile      = "Master_Log_File"
 	ReplicationStatusExecMasterLogPos   = "Exec_Master_Log_Pos"
+
+	ReplicationStatusSlaveIORunningYes  = "Yes"
+	ReplicationStatusSlaveSQLRunningYes = "Yes"
 )

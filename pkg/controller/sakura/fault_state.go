@@ -12,6 +12,7 @@ const (
 
 // decideNextStateOnFault determines the next state on fault state
 func decideNextStateOnFault(
+	logger *slog.Logger,
 	neighbors *NeighborSet,
 ) controller.State {
 	if neighbors.primaryNodeExists() {
@@ -19,7 +20,7 @@ func decideNextStateOnFault(
 	}
 
 	if neighbors.candidateNodeExists() || neighbors.replicaNodeExists() {
-		slog.Info("another candidate or replica exists")
+		logger.Info("another candidate or replica exists")
 		return controller.StateFault
 	}
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/controller"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/frrouting/bgpd"
+	"github.com/sakura-internet/distributed-mariadb-controller/pkg/frrouting/vtysh"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/mariadb"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/nftables"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/process"
@@ -38,6 +39,9 @@ var (
 
 type SAKURAController struct {
 	Logger *slog.Logger
+	// currentState is the current state of the controller.
+	// for prevending unexpected transition, the state isn't exposed.
+	currentState controller.State
 	// prevState is the previous state of the controller.
 	prevState controller.State
 	// m is a read-write-mutex that is used for sharing controller's state btw controller/http-api goroutines.
@@ -61,9 +65,6 @@ type SAKURAController struct {
 
 	// nftablesConnector communicates with FRRouting BGPd via vtysh.
 	nftablesConnector nftables.Connector
-	// currentState is the current state of the controller.
-	// for prevending unexpected transition, the state isn't exposed.
-	currentState controller.State
 	// bgpdConnector communicates with FRRouting BGPd via vtysh.
 	bgpdConnector bgpd.BGPdConnector
 	// processControlConnector manages the linux process.
@@ -93,7 +94,7 @@ func (c *SAKURAController) DecideNextState() controller.State {
 
 	switch c.GetState() {
 	case controller.StateFault:
-		return decideNextStateOnFault(neighbors)
+		return decideNextStateOnFault(c.Logger, neighbors)
 	case SAKURAControllerStateCandidate:
 		return decideNextStateOnCandidate(
 			c.Logger,
@@ -131,7 +132,7 @@ func (c *SAKURAController) OnStateHandler(nextState controller.State) error {
 
 	if c.keepStateInPrevTransition() {
 		if err := c.triggerRunOnStateKeeps(); err != nil {
-			slog.Error("failed to triggerRunOnStateKeeps. transition to fault state and exit", err, "state", string(c.GetState()))
+			c.Logger.Error("failed to triggerRunOnStateKeeps. transition to fault state and exit", err, "state", string(c.GetState()))
 			c.forceTransitionToFault()
 			panic("urgently exit")
 		}
@@ -141,7 +142,7 @@ func (c *SAKURAController) OnStateHandler(nextState controller.State) error {
 
 	if err := c.triggerRunOnStateChanges(); err != nil {
 		// we urgently transition to fault state
-		slog.Error("failed to TriggerRunOnStateChanges. transition to fault state.", err, "state", string(c.GetState()))
+		c.Logger.Error("failed to TriggerRunOnStateChanges. transition to fault state.", err, "state", string(c.GetState()))
 		c.forceTransitionToFault()
 	}
 
@@ -154,7 +155,7 @@ func (c *SAKURAController) PreDecideNextStateHandler() error {
 	prefixes, err := c.collectStateCommunityRoutePrefixes()
 	if err != nil {
 		// we urgently transition to fault state
-		slog.Error("failed to collect BGP routes", err, "state", c.GetState())
+		c.Logger.Error("failed to collect BGP routes", err, "state", c.GetState())
 		c.forceTransitionToFault()
 
 		return nil
@@ -207,7 +208,12 @@ func (c *SAKURAController) SetState(nextState controller.State) {
 
 func NewSAKURAController(logger *slog.Logger, configs ...ControllerConfig) *SAKURAController {
 	c := &SAKURAController{
-		Logger: logger,
+		Logger:                  logger,
+		CurrentNeighbors:        NewNeighborSet(),
+		nftablesConnector:       nftables.NewDefaultConnector(logger),
+		bgpdConnector:           vtysh.NewDefaultBGPdConnector(logger),
+		processControlConnector: process.NewDefaultConnector(logger),
+		mariaDBConnector:        mariadb.NewDefaultConnector(logger),
 	}
 
 	for _, cfg := range configs {
@@ -220,7 +226,7 @@ func NewSAKURAController(logger *slog.Logger, configs ...ControllerConfig) *SAKU
 func (c *SAKURAController) triggerRunOnStateChanges() error {
 	switch c.GetState() {
 	case controller.StatePrimary:
-		if err := c.triggerRunOnStateChangesToPrimary(c.CurrentNeighbors); err != nil {
+		if err := c.triggerRunOnStateChangesToPrimary(); err != nil {
 			return err
 		}
 	case controller.StateFault:
@@ -232,7 +238,7 @@ func (c *SAKURAController) triggerRunOnStateChanges() error {
 			return err
 		}
 	case controller.StateReplica:
-		if err := c.triggerRunOnStateChangesToReplica(c.CurrentNeighbors); err != nil {
+		if err := c.triggerRunOnStateChangesToReplica(); err != nil {
 			return err
 		}
 	case SAKURAControllerStateAnchor:
@@ -246,18 +252,13 @@ func (c *SAKURAController) triggerRunOnStateChanges() error {
 func (c *SAKURAController) triggerRunOnStateKeeps() error {
 	switch c.GetState() {
 	case controller.StatePrimary:
-		/*
-			if err := c.triggerRunOnStateKeepsPrimary(ns); err != nil {
-				return err
-			}
-		*/
-
+		if err := c.triggerRunOnStateKeepsPrimary(); err != nil {
+			return err
+		}
 	case controller.StateReplica:
-		/*
-			if err := c.triggerRunOnStateKeepsReplica(ns); err != nil {
-				return err
-			}
-		*/
+		if err := c.triggerRunOnStateKeepsReplica(); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -277,7 +278,7 @@ func (c *SAKURAController) advertiseSelfNetIFAddress() error {
 func (c *SAKURAController) forceTransitionToFault() {
 	c.SetState(controller.StateFault)
 	if err := c.triggerRunOnStateChanges(); err != nil {
-		slog.Info("failed to TriggerRunOnStateChanges while going to fault. Ignore errors.", err)
+		c.Logger.Info("failed to TriggerRunOnStateChanges while going to fault. Ignore errors.", err)
 	}
 }
 
@@ -328,7 +329,7 @@ const (
 func (c *SAKURAController) readyToBePromotedToPrimary() ReadyToPrimaryJudge {
 	status, err := c.mariaDBConnector.ShowReplicationStatus()
 	if err != nil {
-		slog.Debug("failed to show replication status", "error", err)
+		c.Logger.Debug("failed to show replication status", "error", err)
 		return ReadytoPrimaryJudgeNG
 	}
 
