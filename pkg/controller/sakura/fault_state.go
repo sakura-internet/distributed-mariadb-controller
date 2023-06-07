@@ -10,15 +10,15 @@ const (
 	MariaDBDaemonProcessPath = "/usr/sbin/mariadbd"
 )
 
-// makeDecisionOnFault determines the next state on fault state
-func makeDecisionOnFault(
-	currentNeighbors *NeighborSet,
+// decideNextStateOnFault determines the next state on fault state
+func decideNextStateOnFault(
+	neighbors *NeighborSet,
 ) controller.State {
-	if currentNeighbors.primaryNodeExists() {
+	if neighbors.primaryNodeExists() {
 		return controller.StateReplica
 	}
 
-	if currentNeighbors.candidateNodeExists() || currentNeighbors.replicaNodeExists() {
+	if neighbors.candidateNodeExists() || neighbors.replicaNodeExists() {
 		slog.Info("another candidate or replica exists")
 		return controller.StateFault
 	}

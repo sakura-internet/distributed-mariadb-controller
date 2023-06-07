@@ -5,10 +5,10 @@ package controller
 type Controller interface {
 	/// GetState returns the current state of the controller.
 	GetState() State
-	// PreMakeDecisionHandler is triggered before calling MakeDecision()
-	PreMakeDecisionHandler() error
-	// MakeDecision determines next state that the controller should transition.
-	MakeDecision() State
+	// PreDecideNextStateHandler is triggered before calling MakeDecision()
+	PreDecideNextStateHandler() error
+	// DecideNextState determines next state that the controller should transition.
+	DecideNextState() State
 	// OnStateHandler is an implementation of the root state handler.
 	// All controller must trigget the state handler on the given state.
 	OnStateHandler(nextState State) error
@@ -30,15 +30,20 @@ const (
 // each method of the Controller does nothing.
 type UnimplementedController struct{}
 
+// DecideNextState implements Controller
+func (*UnimplementedController) DecideNextState() State {
+	return StateFault
+}
+
+// PreDecideNextStateHandler implements Controller
+func (*UnimplementedController) PreDecideNextStateHandler() error {
+	return nil
+}
+
 var _ Controller = &UnimplementedController{}
 
 // GetState implements Controller
 func (*UnimplementedController) GetState() State {
-	return StateFault
-}
-
-// MakeDecision implements Controller
-func (*UnimplementedController) MakeDecision() State {
 	return StateFault
 }
 
@@ -49,10 +54,5 @@ func (*UnimplementedController) OnExit() error {
 
 // OnStateHandler implements Controller
 func (*UnimplementedController) OnStateHandler(nextState State) error {
-	return nil
-}
-
-// PreMakeDecisionHandler implements Controller
-func (*UnimplementedController) PreMakeDecisionHandler() error {
 	return nil
 }

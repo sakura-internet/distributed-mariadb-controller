@@ -10,21 +10,7 @@ import (
 	"golang.org/x/exp/slog"
 )
 
-// Connector is an interface that communicates with FRRouting BGPd.
-type BGPdConnector interface {
-	// ShowRoutesWithBGPCommunityList shows the routes that with the given bgp community-list.
-	ShowRoutesWithBGPCommunityList(
-		communityList string,
-	) (bgpd.BGP, error)
-
-	// ConfigureRouteWithRouteMap configs the route-advertising with the given route-map.
-	ConfigureRouteWithRouteMap(
-		prefix net.IPNet,
-		routeMap string,
-	) error
-}
-
-func NewDefaultBGPdConnector(logger *slog.Logger) BGPdConnector {
+func NewDefaultBGPdConnector(logger *slog.Logger) bgpd.BGPdConnector {
 	return &VtyshBGPdConnector{Logger: logger}
 }
 

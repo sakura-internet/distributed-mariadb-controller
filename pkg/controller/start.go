@@ -26,14 +26,14 @@ controllerLoop:
 			ctrler.OnExit()
 			break controllerLoop
 		case <-ticker.C:
-			if err := ctrler.PreMakeDecisionHandler(); err != nil {
+			if err := ctrler.PreDecideNextStateHandler(); err != nil {
 				logger.Error("controller.PreMakeDecisionHandler()", err, "state", ctrler.GetState())
 				continue
 			}
 
 			time.Sleep(time.Second * time.Duration(rand.Intn(2)+1))
 
-			nextState := ctrler.MakeDecision()
+			nextState := ctrler.DecideNextState()
 
 			if err := ctrler.OnStateHandler(nextState); err != nil {
 				logger.Error("controller.OnStateHandler()", err, "state", nextState)

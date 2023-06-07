@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/controller"
-	"github.com/sakura-internet/distributed-mariadb-controller/pkg/frrouting/vtysh"
+	"github.com/sakura-internet/distributed-mariadb-controller/pkg/frrouting/bgpd"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/mariadb"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/nftables"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/process"
@@ -65,7 +65,7 @@ type SAKURAController struct {
 	// for prevending unexpected transition, the state isn't exposed.
 	currentState controller.State
 	// bgpdConnector communicates with FRRouting BGPd via vtysh.
-	bgpdConnector vtysh.BGPdConnector
+	bgpdConnector bgpd.BGPdConnector
 	// processControlConnector manages the linux process.
 	processControlConnector process.ProcessControlConnector
 	// systemdConnector manages the systemd services.
@@ -73,6 +73,9 @@ type SAKURAController struct {
 	// mariaDBConnector communicates with MariaDB via mysql-client.
 	mariaDBConnector mariadb.Connector
 }
+
+// for guarding that the sakura controller implements
+var _ controller.Controller = &SAKURAController{}
 
 // GetState implements controller.Controller
 func (c *SAKURAController) GetState() controller.State {
@@ -82,26 +85,25 @@ func (c *SAKURAController) GetState() controller.State {
 	return c.currentState
 }
 
-// MakeDecision implements controller.Controller
-func (c *SAKURAController) MakeDecision() controller.State {
-	currentNeighbors := c.CurrentNeighbors
-	currentMariaDBHealth := c.CurrentMariaDBHealth
+// DecideNextState implements controller.Controller
+func (c *SAKURAController) DecideNextState() controller.State {
+	neighbors := c.CurrentNeighbors
+	mariaDBHealth := c.CurrentMariaDBHealth
 	readyToPrimary := c.ReadyToPrimary
+
 	switch c.GetState() {
 	case controller.StateFault:
-		return makeDecisionOnFault(currentNeighbors)
+		return decideNextStateOnFault(neighbors)
 	case SAKURAControllerStateCandidate:
-		return makeDecisionOnCandidate(
+		return decideNextStateOnCandidate(
 			c.Logger,
-			currentNeighbors,
-			currentMariaDBHealth,
+			neighbors,
+			mariaDBHealth,
 			readyToPrimary)
 	case controller.StatePrimary:
-		return makeDecisionNextStateOnPrimary(c.Logger, currentNeighbors, currentMariaDBHealth)
-		/*
-			case StateReplica:
-				return c.decisionNextStateOnReplica(ns, mariaDBHealth)
-		*/
+		return decideNextStateOnPrimary(c.Logger, neighbors, mariaDBHealth)
+	case controller.StateReplica:
+		return decideNextStateOnReplica(neighbors, mariaDBHealth)
 	case controller.StateInitial:
 		// just initialized controller take this case.
 		return controller.StateFault
@@ -146,8 +148,8 @@ func (c *SAKURAController) OnStateHandler(nextState controller.State) error {
 	return nil
 }
 
-// PreMakeDecisionHandler implements controller.Controller
-func (c *SAKURAController) PreMakeDecisionHandler() error {
+// PreDecideNextStateHandler implements controller.Controller
+func (c *SAKURAController) PreDecideNextStateHandler() error {
 	prevNeighbors := c.CurrentNeighbors
 	prefixes, err := c.collectStateCommunityRoutePrefixes()
 	if err != nil {
@@ -218,7 +220,7 @@ func NewSAKURAController(logger *slog.Logger, configs ...ControllerConfig) *SAKU
 func (c *SAKURAController) triggerRunOnStateChanges() error {
 	switch c.GetState() {
 	case controller.StatePrimary:
-		if err := c.triggerRunOnStateChangesToPrimary(currentNeighbors); err != nil {
+		if err := c.triggerRunOnStateChangesToPrimary(c.CurrentNeighbors); err != nil {
 			return err
 		}
 	case controller.StateFault:
@@ -230,11 +232,9 @@ func (c *SAKURAController) triggerRunOnStateChanges() error {
 			return err
 		}
 	case controller.StateReplica:
-		/*
-			if err := c.triggerRunOnStateChangesToReplica(currentNeighbors); err != nil {
-				return err
-			}
-		*/
+		if err := c.triggerRunOnStateChangesToReplica(c.CurrentNeighbors); err != nil {
+			return err
+		}
 	case SAKURAControllerStateAnchor:
 		panic("unreachable")
 	}

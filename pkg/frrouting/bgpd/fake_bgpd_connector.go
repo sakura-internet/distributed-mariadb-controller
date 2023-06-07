@@ -1,9 +1,7 @@
-package vtysh
+package bgpd
 
 import (
 	"net"
-
-	"github.com/sakura-internet/distributed-mariadb-controller/pkg/frrouting/bgpd"
 )
 
 // FakeBGPdConnector is for testing the controller.
@@ -19,8 +17,8 @@ func (c *FakeBGPdConnector) ConfigureRouteWithRouteMap(prefix net.IPNet, routeMa
 }
 
 // ShowRoutesWithBGPCommunityList implements vtysh.BGPdConnector
-func (*FakeBGPdConnector) ShowRoutesWithBGPCommunityList(communityList string) (bgpd.BGP, error) {
-	return bgpd.BGP{}, nil
+func (*FakeBGPdConnector) ShowRoutesWithBGPCommunityList(communityList string) (BGP, error) {
+	return BGP{}, nil
 }
 
 func NewFakeBGPdConnector() BGPdConnector {

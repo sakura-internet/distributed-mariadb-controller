@@ -7,10 +7,10 @@ import (
 	"golang.org/x/exp/slog"
 )
 
-// makeDecisionOnCandidate determines the next state on candidate state.
-func makeDecisionOnCandidate(
+// decideNextStateOnCandidate determines the next state on candidate state.
+func decideNextStateOnCandidate(
 	logger *slog.Logger,
-	currentNeighbors *NeighborSet,
+	neighbors *NeighborSet,
 	mariaDBHealth MariaDBHealthCheckResult,
 	readyToPrimaryJudge ReadyToPrimaryJudge,
 ) controller.State {
@@ -19,7 +19,7 @@ func makeDecisionOnCandidate(
 		return controller.StateFault
 	}
 
-	if currentNeighbors.candidateNodeExists() || currentNeighbors.primaryNodeExists() {
+	if neighbors.candidateNodeExists() || neighbors.primaryNodeExists() {
 		logger.Info("another candidate or primary exists. falling back to fault state.")
 		return controller.StateFault
 	}

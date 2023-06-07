@@ -1,7 +1,8 @@
 package sakura
 
 import (
-	"github.com/sakura-internet/distributed-mariadb-controller/pkg/frrouting/vtysh"
+	"github.com/sakura-internet/distributed-mariadb-controller/pkg/frrouting/bgpd"
+	"github.com/sakura-internet/distributed-mariadb-controller/pkg/mariadb"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/nftables"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/process"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/systemd"
@@ -17,13 +18,11 @@ func SystemdConnector(connector systemd.Connector) ControllerConfig {
 	}
 }
 
-/*
 func MariaDBConnector(connector mariadb.Connector) ControllerConfig {
 	return func(c *SAKURAController) {
-		c.mariadbConnector = connector
+		c.mariaDBConnector = connector
 	}
 }
-*/
 
 // NftablesConnector generates a config that sets the nftables.Connector into SAKURAController.
 func NftablesConnector(connector nftables.Connector) ControllerConfig {
@@ -33,7 +32,7 @@ func NftablesConnector(connector nftables.Connector) ControllerConfig {
 }
 
 // BGPdConnector generates a config that sets the vtysh.BGPdConnector into SAKURAController.
-func BGPdConnector(connector vtysh.BGPdConnector) ControllerConfig {
+func BGPdConnector(connector bgpd.BGPdConnector) ControllerConfig {
 	return func(c *SAKURAController) {
 		c.bgpdConnector = connector
 	}

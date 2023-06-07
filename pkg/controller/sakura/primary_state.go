@@ -8,10 +8,10 @@ import (
 	"golang.org/x/exp/slog"
 )
 
-// makeDecisionNextStateOnPrimary determines the next state on primary state
-func makeDecisionNextStateOnPrimary(
+// decideNextStateOnPrimary determines the next state on primary state
+func decideNextStateOnPrimary(
 	logger *slog.Logger,
-	currentNeighbors *NeighborSet,
+	neighbors *NeighborSet,
 	mariaDBHealth MariaDBHealthCheckResult,
 ) controller.State {
 	if mariaDBHealth == MariaDBHealthCheckResultNG {
@@ -20,7 +20,7 @@ func makeDecisionNextStateOnPrimary(
 	}
 
 	// found dual-primary situation.
-	if currentNeighbors.primaryNodeExists() {
+	if neighbors.primaryNodeExists() {
 		logger.Warn("dual primary detected")
 		return controller.StateFault
 	}
@@ -31,12 +31,12 @@ func makeDecisionNextStateOnPrimary(
 
 // triggerRunOnStateChangesToPrimary processes transition to primary state in main loop.
 func (c *SAKURAController) triggerRunOnStateChangesToPrimary(
-	ns *NeighborSet,
+	neighbors *NeighborSet,
 ) error {
 	if health := c.checkMariaDBHealth(); health == MariaDBHealthCheckResultNG {
 		return fmt.Errorf("MariaDB instance is down")
 	}
-	if ns.primaryNodeExists() {
+	if neighbors.primaryNodeExists() {
 		return fmt.Errorf("dual primary detected")
 	}
 
