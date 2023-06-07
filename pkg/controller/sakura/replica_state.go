@@ -64,7 +64,7 @@ func (c *SAKURAController) triggerRunOnStateChangesToReplica() error {
 		Host:     primaryNode.Address,
 		Port:     mariaDBMasterDefaultPort,
 		User:     mariaDBMasterDefaultUser,
-		Password: c.dbReplicaPassword,
+		Password: c.MariaDBReplicaPassword,
 		UseGTID:  mariadb.MasterUseGTIDValueCurrentPos,
 	}
 	if err := c.mariaDBConnector.ChangeMasterTo(master); err != nil {

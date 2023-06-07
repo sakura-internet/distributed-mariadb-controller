@@ -1,9 +1,11 @@
 package sakura
 
 import (
+	"math/rand"
 	"net"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/controller"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/frrouting/bgpd"
@@ -46,10 +48,10 @@ type SAKURAController struct {
 	prevState controller.State
 	// m is a read-write-mutex that is used for sharing controller's state btw controller/http-api goroutines.
 	m sync.RWMutex
-	// selfAddr is an IP address of the eth0.
-	selfAddr string
-	// dbReplicaPassword is credential used by replica to establish replication link for primary
-	dbReplicaPassword string
+	// HostAddress is an IP address of the eth0.
+	HostAddress string
+	// MariaDBReplicaPassword is credential used by replica to establish replication link for primary
+	MariaDBReplicaPassword string
 	// replicationStatusCheckFailCount is a counter of the MariaDB's replication status checker in replica state.
 	replicationStatusCheckFailCount uint
 	// writeTestDataFailCount is a counter that the controller tries to write test data to MariaDB.
@@ -88,23 +90,32 @@ func (c *SAKURAController) GetState() controller.State {
 
 // DecideNextState implements controller.Controller
 func (c *SAKURAController) DecideNextState() controller.State {
-	neighbors := c.CurrentNeighbors
-	mariaDBHealth := c.CurrentMariaDBHealth
-	readyToPrimary := c.ReadyToPrimary
+	if networkIsParted(c.CurrentNeighbors) {
+		c.Logger.Info("detected network partition", "neighbors", c.CurrentNeighbors.NeighborAddresses())
+		return controller.StateFault
+	}
 
 	switch c.GetState() {
 	case controller.StateFault:
-		return decideNextStateOnFault(c.Logger, neighbors)
+		return decideNextStateOnFault(c.Logger, c.CurrentNeighbors)
 	case SAKURAControllerStateCandidate:
 		return decideNextStateOnCandidate(
 			c.Logger,
-			neighbors,
-			mariaDBHealth,
-			readyToPrimary)
+			c.CurrentNeighbors,
+			c.CurrentMariaDBHealth,
+			c.ReadyToPrimary,
+		)
 	case controller.StatePrimary:
-		return decideNextStateOnPrimary(c.Logger, neighbors, mariaDBHealth)
+		return decideNextStateOnPrimary(
+			c.Logger,
+			c.CurrentNeighbors,
+			c.CurrentMariaDBHealth,
+		)
 	case controller.StateReplica:
-		return decideNextStateOnReplica(neighbors, mariaDBHealth)
+		return decideNextStateOnReplica(
+			c.CurrentNeighbors,
+			c.CurrentMariaDBHealth,
+		)
 	case controller.StateInitial:
 		// just initialized controller take this case.
 		return controller.StateFault
@@ -125,6 +136,8 @@ func (c *SAKURAController) OnExit() error {
 
 // OnStateHandler implements controller.Controller
 func (c *SAKURAController) OnStateHandler(nextState controller.State) error {
+	time.Sleep(time.Second * time.Duration(rand.Intn(2)+1))
+
 	if cannotTransitionTo(c.GetState(), nextState) {
 		panic("unreachable controller state was picked")
 	}
@@ -267,7 +280,7 @@ func (c *SAKURAController) triggerRunOnStateKeeps() error {
 // advertiseSelfNetIFAddress updates the configuration of the advertising route.
 // the BGP community of the advertising route will be updated with the current controller-state.
 func (c *SAKURAController) advertiseSelfNetIFAddress() error {
-	_, selfAddr, err := net.ParseCIDR(c.selfAddr + "/32")
+	_, selfAddr, err := net.ParseCIDR(c.HostAddress + "/32")
 	if err != nil {
 		return err
 	}
@@ -399,7 +412,7 @@ func (c *SAKURAController) extractNeighborAddresses(
 			// each prefix of the advertised BGP route is the unicast address of other DB instances.
 			// if the route prefix(unicast IP) and my address are same,
 			// the route is advertised from me so it should be ignored.
-			if prefix.String() == c.selfAddr {
+			if prefix.String() == c.HostAddress {
 				continue
 			}
 
@@ -484,4 +497,19 @@ func cannotTransitionTo(
 		// unreachable
 		return true
 	}
+}
+
+// networkIsParted returns true if there is no neighbor on the network.
+func networkIsParted(
+	neighbors *NeighborSet,
+) bool {
+	if neighbors.primaryNodeExists() ||
+		neighbors.candidateNodeExists() ||
+		neighbors.replicaNodeExists() ||
+		neighbors.faultNodeExists() ||
+		neighbors.anchorNodeExists() {
+		return false
+	}
+
+	return true
 }

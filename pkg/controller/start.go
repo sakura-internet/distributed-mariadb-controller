@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"math/rand"
 	"time"
 
 	"golang.org/x/exp/slog"
@@ -31,10 +30,9 @@ controllerLoop:
 				continue
 			}
 
-			time.Sleep(time.Second * time.Duration(rand.Intn(2)+1))
-
 			nextState := ctrler.DecideNextState()
 
+			logger.Debug("controller decides next state", "state", nextState)
 			if err := ctrler.OnStateHandler(nextState); err != nil {
 				logger.Error("controller.OnStateHandler()", err, "state", nextState)
 			}

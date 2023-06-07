@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/prometheus/client_golang v1.15.1
 	github.com/stretchr/testify v1.8.0
+	github.com/vishvananda/netlink v1.1.0
 	golang.org/x/exp v0.0.0-20230213192124-5e25df0256eb
 )
 
@@ -20,6 +21,7 @@ require (
 	github.com/prometheus/common v0.42.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
+	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df // indirect
 	golang.org/x/sys v0.6.0 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

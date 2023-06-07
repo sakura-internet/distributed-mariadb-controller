@@ -22,7 +22,7 @@ func _newFakeSAKURAController() *SAKURAController {
 		ProcessControlConnector(process.NewFakeProcessControlConnector()),
 	)
 
-	c.selfAddr = "10.0.0.1"
-	c.dbReplicaPassword = "dummy-db-replica-password"
+	c.HostAddress = "10.0.0.1"
+	c.MariaDBReplicaPassword = "dummy-db-replica-password"
 	return c
 }
