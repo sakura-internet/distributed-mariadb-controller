@@ -225,7 +225,6 @@ func createNftablesChain(
 		chainName = "mariadb"
 	)
 	// nft add chain comand returns ok if the chain is already exist.
-
 	cmd := fmt.Sprintf("nft add chain filter %s { type filter hook input priority 0\\; }", chainName)
 	logger.Info("execute command", "command", cmd, "callerFn", "createNftablesChain")
 	if _, err := bash.RunCommand(cmd); err != nil {

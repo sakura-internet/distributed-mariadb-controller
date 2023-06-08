@@ -12,6 +12,7 @@ const (
 	controllerStateCtxKey = "controllerState"
 )
 
+// UseControllerState is an echo middleware that injects the current state of the db-controller into othe request context.
 func UseControllerState(ctrler *sakura.SAKURAController) func(echo.HandlerFunc) echo.HandlerFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -21,6 +22,7 @@ func UseControllerState(ctrler *sakura.SAKURAController) func(echo.HandlerFunc) 
 	}
 }
 
+// ExtractControllerState is an utility for retrieving the controller state from request context.
 func ExtractControllerState(c echo.Context) (controller.State, error) {
 	v := c.Get(controllerStateCtxKey)
 	if v == nil {

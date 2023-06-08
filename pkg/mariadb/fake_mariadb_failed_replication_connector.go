@@ -1,0 +1,73 @@
+package mariadb
+
+type FakeMariaDBFailedReplicationConnector struct {
+}
+
+func NewFakeMariaDBFailedReplicationConnector() Connector {
+	return &FakeMariaDBFailedReplicationConnector{}
+}
+
+// ChangeMasterTo implements mariadb.Connector
+func (c *FakeMariaDBFailedReplicationConnector) ChangeMasterTo(master MasterInstance) error {
+	return nil
+}
+
+// CheckBoolVariableIsON implements mariadb.Connector
+func (c *FakeMariaDBFailedReplicationConnector) CheckBoolVariableIsON(variableName string) bool {
+	return true
+}
+
+// ResetAllReplicas implements mariadb.Connector
+func (c *FakeMariaDBFailedReplicationConnector) ResetAllReplicas() error {
+	return nil
+}
+
+// ShowReplicationStatus implements mariadb.Connector
+func (c *FakeMariaDBFailedReplicationConnector) ShowReplicationStatus() (ReplicationStatus, error) {
+	status := ReplicationStatus{
+		ReplicationStatusSlaveIORunning:  "Yes",
+		ReplicationStatusSlaveSQLRunning: "No", // data-inconsistency
+	}
+
+	return status, nil
+}
+
+// StartReplica implements mariadb.Connector
+func (c *FakeMariaDBFailedReplicationConnector) StartReplica() error {
+	return nil
+}
+
+// StopReplica implements mariadb.Connector
+func (c *FakeMariaDBFailedReplicationConnector) StopReplica() error {
+	return nil
+}
+
+// TurnOffBoolVariable implements mariadb.Connector
+func (c *FakeMariaDBFailedReplicationConnector) TurnOffBoolVariable(variableName string) error {
+	return nil
+}
+
+// TurnOnBoolVariable implements mariadb.Connector
+func (c *FakeMariaDBFailedReplicationConnector) TurnOnBoolVariable(variableName string) error {
+	return nil
+}
+
+// CreateDatabase implements mariadb.Connector
+func (*FakeMariaDBFailedReplicationConnector) CreateDatabase(dbName string) error {
+	return nil
+}
+
+// CreateIDTable implements mariadb.Connector
+func (*FakeMariaDBFailedReplicationConnector) CreateIDTable(dbName string, tableName string) error {
+	return nil
+}
+
+// DeleteRecords implements mariadb.Connector
+func (*FakeMariaDBFailedReplicationConnector) DeleteRecords(dbName string, tableName string) error {
+	return nil
+}
+
+// InsertIDRecord implements mariadb.Connector
+func (*FakeMariaDBFailedReplicationConnector) InsertIDRecord(dbName string, tableName string, id int) error {
+	return nil
+}

@@ -51,3 +51,10 @@ func TestDecideNextStateCandidate_RemainCandidate(t *testing.T) {
 	nextState := decideNextStateOnCandidate(logger, ns, MariaDBHealthCheckResultOK, ReadytoPrimaryJudgeNG)
 	assert.Equal(t, SAKURAControllerStateCandidate, nextState)
 }
+
+func TestTriggerRunOnStateChangesToCandidate_OKPath(t *testing.T) {
+	c := _newFakeSAKURAController()
+
+	err := c.triggerRunOnStateChangesToCandidate()
+	assert.NoError(t, err)
+}

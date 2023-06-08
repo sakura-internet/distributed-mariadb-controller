@@ -10,6 +10,8 @@ type GetDBControllerStatusResponse struct {
 	State string `json:"state"`
 }
 
+// GetDBControllerStatus is an http handler that returns the current state of the db-controller.
+// that assumes the `UseControllerState` middleware before triggered this.
 func GetDBControllerStatus(c echo.Context) error {
 	state, err := ExtractControllerState(c)
 	if err != nil {
