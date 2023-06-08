@@ -2,6 +2,7 @@ package sakura
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/controller"
 )
 
@@ -32,4 +33,19 @@ func init() {
 	DBControllerStateGaugeVec.WithLabelValues(string(SAKURAControllerStateCandidate)).Set(0)
 	DBControllerStateGaugeVec.WithLabelValues(string(controller.StateReplica)).Set(0)
 	DBControllerStateGaugeVec.WithLabelValues(string(controller.StatePrimary)).Set(0)
+}
+
+func NewPrometheusMetricRegistry() *prometheus.Registry {
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(
+		// Go runtime metric collector
+		collectors.NewGoCollector(),
+		// process metric collector
+		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
+
+		// db-controller
+		DBControllerStateGaugeVec,
+		DBControllerStateTransitionCounterVec,
+	)
+	return reg
 }

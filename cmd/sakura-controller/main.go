@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -13,6 +14,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/gommon/log"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	apiv0 "github.com/sakura-internet/distributed-mariadb-controller/cmd/sakura-controller/api/v0"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/bash"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/controller"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/controller/sakura"
@@ -81,17 +87,15 @@ func main() {
 		controller.Start(ctx, logger, controller.Controller(c), time.Second*time.Duration(MainPollingSpanSecondFlag))
 	}(ctx, wg, c)
 
-	/*
-		if EnablePrometheusExporterFlag {
-			wg.Add(1)
-			go startPrometheusExporterServer(ctx, wg)
-		}
+	if EnablePrometheusExporterFlag {
+		wg.Add(1)
+		go startPrometheusExporterServer(ctx, wg)
+	}
 
-		if EnableHTTPAPIFlag {
-			wg.Add(1)
-			go startHTTPAPIServer(ctx, wg, c)
-		}
-	*/
+	if EnableHTTPAPIFlag {
+		wg.Add(1)
+		go startHTTPAPIServer(ctx, wg, c)
+	}
 
 	signal.Ignore(syscall.SIGHUP, syscall.SIGPIPE)
 	stopSigCh := make(chan os.Signal, 3)
@@ -111,7 +115,6 @@ mainLoop:
 	logger.Info("db-controller exited. see you again, bye.")
 }
 
-/*
 // startPrometheusExporterServer starts the HTTP server that serves the prometheus-exporter endpoint.
 func startPrometheusExporterServer(
 	ctx context.Context,
@@ -134,7 +137,7 @@ func startPrometheusExporterServer(
 		e.Logger.SetLevel(log.ERROR)
 	}
 
-	reg := metric.NewRegistry()
+	reg := sakura.NewPrometheusMetricRegistry()
 	e.GET("/metrics", echo.WrapHandler(promhttp.HandlerFor(reg, promhttp.HandlerOpts{})))
 
 	// Start server
@@ -213,8 +216,6 @@ waitLoop:
 		}
 	}
 }
-
-*/
 
 // createNftablesChain tries to create an nftables chain on filter table.
 func createNftablesChain(

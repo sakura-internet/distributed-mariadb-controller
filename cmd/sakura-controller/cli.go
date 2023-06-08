@@ -22,8 +22,6 @@ var (
 
 	// EnablePrometheusExporterFlag is a cli-flag that enables the prometheus exporter.
 	EnablePrometheusExporterFlag bool
-	// EnableDBControllerFlag is a cli-flag that enables the db-controller.
-	EnableDBControllerFlag bool
 	// EnableHTTPAPIFlag is a cli-flag that enables the http api server.
 	EnableHTTPAPIFlag bool
 )
@@ -41,7 +39,6 @@ func parseAllFlags(args []string) error {
 	fs.IntVar(&HTTPAPIServerPortFlag, "http-api-server-port", 54545, "the port the http api server listens")
 
 	fs.BoolVar(&EnablePrometheusExporterFlag, "prometheus-exporter", true, "enables the prometheus exporter")
-	fs.BoolVar(&EnableDBControllerFlag, "db-controller", true, "enables the db-controller")
 	fs.BoolVar(&EnableHTTPAPIFlag, "http-api", true, "enables the http api server")
 
 	return fs.Parse(args)
