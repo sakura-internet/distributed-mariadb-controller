@@ -36,7 +36,7 @@ func (c *VtyshBGPdConnector) ShowRoutesWithBGPCommunityList(
 	}
 
 	if err := json.Unmarshal(out, &bgp); err != nil {
-		return bgp, err
+		return bgp, fmt.Errorf("failed to unmarchal to bgpd.BGP: %w", err)
 	}
 
 	return bgp, nil
