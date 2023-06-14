@@ -19,10 +19,10 @@ import (
 
 const (
 	// SAKURAControllerStateCandidate is the controller state that is ready to be promoted to Primary state.
-	SAKURAControllerStateCandidate controller.State = "Candidate"
+	SAKURAControllerStateCandidate controller.State = "candidate"
 	// SAKURAControllerStateAnchor indicates the controller is not exist and the node is under the anchor mode.
 	// The State is not used in db-controller.
-	SAKURAControllerStateAnchor controller.State = "Anchor"
+	SAKURAControllerStateAnchor controller.State = "anchor"
 	mariaDBServerDefaultIFName                   = "eth0"
 	mariaDBServerDefaultPort                     = 3306
 	nftablesMariaDBChain                         = "mariadb"

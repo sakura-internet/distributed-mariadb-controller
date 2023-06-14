@@ -20,10 +20,10 @@ type Controller interface {
 type State string
 
 const (
-	StateInitial State = "Initial"
-	StatePrimary State = "Primary"
-	StateReplica State = "Replica"
-	StateFault   State = "Fault"
+	StateInitial State = "initial"
+	StatePrimary State = "primary"
+	StateReplica State = "replica"
+	StateFault   State = "fault"
 )
 
 // UnimplementedController implements Controller interface.
