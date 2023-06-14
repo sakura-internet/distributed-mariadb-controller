@@ -222,6 +222,7 @@ func (c *SAKURAController) SetState(nextState controller.State) {
 
 func NewSAKURAController(logger *slog.Logger, configs ...ControllerConfig) *SAKURAController {
 	c := &SAKURAController{
+		currentState:            controller.StateInitial,
 		Logger:                  logger,
 		CurrentNeighbors:        NewNeighborSet(),
 		nftablesConnector:       nftables.NewDefaultConnector(logger),
