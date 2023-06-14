@@ -13,7 +13,7 @@ type ProcessControlConnector interface {
 }
 
 func NewDefaultConnector(logger *slog.Logger) ProcessControlConnector {
-	return &ShellCommandConnector{}
+	return &ShellCommandConnector{Logger: logger}
 }
 
 // ShellCommandConnector is a default implementation of ProcessControlConnector.

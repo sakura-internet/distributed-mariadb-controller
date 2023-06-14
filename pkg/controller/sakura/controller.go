@@ -227,6 +227,7 @@ func NewSAKURAController(logger *slog.Logger, configs ...ControllerConfig) *SAKU
 		bgpdConnector:           vtysh.NewDefaultBGPdConnector(logger),
 		processControlConnector: process.NewDefaultConnector(logger),
 		mariaDBConnector:        mariadb.NewDefaultConnector(logger),
+		systemdConnector:        systemd.NewDefaultConnector(logger),
 	}
 
 	for _, cfg := range configs {
