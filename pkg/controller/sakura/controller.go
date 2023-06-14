@@ -90,6 +90,7 @@ func (c *SAKURAController) GetState() controller.State {
 
 // DecideNextState implements controller.Controller
 func (c *SAKURAController) DecideNextState() controller.State {
+	c.Logger.Debug("decide next state", "current state", c.GetState())
 	if networkIsParted(c.CurrentNeighbors) {
 		c.Logger.Info("detected network partition", "neighbors", c.CurrentNeighbors.NeighborAddresses())
 		return controller.StateFault
