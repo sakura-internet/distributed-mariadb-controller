@@ -83,7 +83,7 @@ func main() {
 
 	wg.Add(1)
 	go func(ctx context.Context, wg *sync.WaitGroup, c *sakura.SAKURAController) {
-		wg.Done()
+		defer wg.Done()
 		controller.Start(ctx, logger, controller.Controller(c), time.Second*time.Duration(MainPollingSpanSecondFlag))
 	}(ctx, wg, c)
 
