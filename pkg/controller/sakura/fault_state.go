@@ -59,7 +59,7 @@ func (c *SAKURAController) triggerRunOnStateChangesToFault() error {
 
 // rejectTCP3306TrafficFromExternal sets the reject rule that denies the inbound communication from the outsider of the network.
 func (c *SAKURAController) rejectTCP3306TrafficFromExternal() error {
-	if err := c.nftablesConnector.FlushChain(
+	if err := c.NftablesConnector.FlushChain(
 		nftables.BuiltinTableFilter,
 		nftablesMariaDBChain,
 	); err != nil {
@@ -70,7 +70,7 @@ func (c *SAKURAController) rejectTCP3306TrafficFromExternal() error {
 		nftables.IFNameMatch(mariaDBServerDefaultIFName),
 		nftables.TCPDstPortMatch(mariaDBServerDefaultPort),
 	}
-	if err := c.nftablesConnector.AddRule(
+	if err := c.NftablesConnector.AddRule(
 		nftables.BuiltinTableFilter,
 		nftablesMariaDBChain,
 		rejectMatches,

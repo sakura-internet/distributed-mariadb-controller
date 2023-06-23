@@ -24,6 +24,9 @@ var (
 	EnablePrometheusExporterFlag bool
 	// EnableHTTPAPIFlag is a cli-flag that enables the http api server.
 	EnableHTTPAPIFlag bool
+
+	// NftablesModeFlag is a cli-flag that specifies the nftables mode (nftcommand/library)
+	NftablesModeFlag string
 )
 
 // ParseAllFlags parses all defined cmd-flags.
@@ -33,6 +36,7 @@ func parseAllFlags(args []string) error {
 	fs.StringVar(&LockFilePathFlag, "lock-filepath", "/var/run/db-controller/lock", "the filepath of the exclusive lock")
 	fs.StringVar(&DBReplicaPasswordFilePathFlag, "db-repilica-password-filepath", "/var/run/db-controller/.db-replica-password", "the filepath of the DB replica password")
 	fs.StringVar(&LogLevelFlag, "log-level", "warning", "the log level(debug/info/warning/error)")
+	fs.StringVar(&NftablesModeFlag, "nftables-mode", "library", "the nftables mode (nftcommand/library)")
 
 	fs.IntVar(&MainPollingSpanSecondFlag, "main-polling-span-second", 4, "the span seconds of the loop in main.go")
 	fs.IntVar(&PrometheusExporterPortFlag, "prometheus-exporter-port", 50505, "the port the prometheus exporter listens")
@@ -49,6 +53,9 @@ func validateAllFlags() error {
 	if invalidLogLevelFlag(LogLevelFlag) {
 		return fmt.Errorf("--log-level must be one of debug/info/warning/error")
 	}
+	if invalidNftablesModeFlag(NftablesModeFlag) {
+		return fmt.Errorf("--nftables-mode must be one of nftcommand/library")
+	}
 
 	if PrometheusExporterPortFlag < 0 || 65535 < PrometheusExporterPortFlag {
 		return fmt.Errorf("--prometheus-exporter-port must be the range of uint16(tcp port)")
@@ -59,5 +66,10 @@ func validateAllFlags() error {
 
 func invalidLogLevelFlag(l string) bool {
 	valid := l == "debug" || l == "info" || l == "warning" || l == "error"
+	return !valid
+}
+
+func invalidNftablesModeFlag(l string) bool {
+	valid := l == "nftcommand" || l == "library"
 	return !valid
 }

@@ -27,7 +27,7 @@ func MariaDBConnector(connector mariadb.Connector) ControllerConfig {
 // NftablesConnector generates a config that sets the nftables.Connector into SAKURAController.
 func NftablesConnector(connector nftables.Connector) ControllerConfig {
 	return func(c *SAKURAController) {
-		c.nftablesConnector = connector
+		c.NftablesConnector = connector
 	}
 }
 

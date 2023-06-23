@@ -58,7 +58,7 @@ func TestTriggerRunOnStateChangesToReplica_OKPath(t *testing.T) {
 	t.Run("TestTriggerRunOnStateChangesToReplica_OKPath_mustCallChangeMasterToWithCorrectArgs", _mustCallChangeMasterToWithCorrectArgs(fakeMariaDBConn, primaryNeighbor.Address, "dummy-db-replica-password"))
 
 	// test with Nftables Connector
-	fakeNftablesConn := c.nftablesConnector.(*nftables.FakeNftablesConnector)
+	fakeNftablesConn := c.NftablesConnector.(*nftables.FakeNftablesConnector)
 	t.Run("TestTriggerRunOnStateChangesToReplica_OKPath_shouldBeCorrectNftablesRejectTCP3306TrafficCommandsOrder", _shouldBeCorrectNftablesRejectTCP3306TrafficCommandsOrder(fakeNftablesConn))
 
 	// Systemd Connector test

@@ -22,6 +22,7 @@ import (
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/bash"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/controller"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/controller/sakura"
+	"github.com/sakura-internet/distributed-mariadb-controller/pkg/nftables"
 	"github.com/vishvananda/netlink"
 
 	"golang.org/x/exp/rand"
@@ -60,6 +61,10 @@ func main() {
 	}
 
 	c := sakura.NewSAKURAController(logger)
+
+	if NftablesModeFlag == "library" {
+		c.NftablesConnector = nftables.NewGoogleNftablesConnector()
+	}
 
 	{
 		eth0Address, err := getEth0NetIFAddress()

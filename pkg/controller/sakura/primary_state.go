@@ -99,7 +99,7 @@ func (c *SAKURAController) triggerRunOnStateKeepsPrimary() error {
 
 // acceptTCP3306Traffic sets the rule that accepts the inbound communication.
 func (c *SAKURAController) acceptTCP3306Traffic() error {
-	if err := c.nftablesConnector.FlushChain(nftables.BuiltinTableFilter, nftablesMariaDBChain); err != nil {
+	if err := c.NftablesConnector.FlushChain(nftables.BuiltinTableFilter, nftablesMariaDBChain); err != nil {
 		return err
 	}
 
@@ -108,7 +108,7 @@ func (c *SAKURAController) acceptTCP3306Traffic() error {
 		nftables.TCPDstPortMatch(mariaDBServerDefaultPort),
 	}
 
-	if err := c.nftablesConnector.AddRule(nftables.BuiltinTableFilter, nftablesMariaDBChain, acceptMatches, nftables.AcceptStatement()); err != nil {
+	if err := c.NftablesConnector.AddRule(nftables.BuiltinTableFilter, nftablesMariaDBChain, acceptMatches, nftables.AcceptStatement()); err != nil {
 		return err
 	}
 

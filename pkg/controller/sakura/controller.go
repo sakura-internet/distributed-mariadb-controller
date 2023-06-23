@@ -65,8 +65,8 @@ type SAKURAController struct {
 	// ReadyToPrimary
 	ReadyToPrimary ReadyToPrimaryJudge
 
-	// nftablesConnector communicates with FRRouting BGPd via vtysh.
-	nftablesConnector nftables.Connector
+	// NftablesConnector communicates with FRRouting BGPd via vtysh.
+	NftablesConnector nftables.Connector
 	// bgpdConnector communicates with FRRouting BGPd via vtysh.
 	bgpdConnector bgpd.BGPdConnector
 	// processControlConnector manages the linux process.
@@ -225,7 +225,7 @@ func NewSAKURAController(logger *slog.Logger, configs ...ControllerConfig) *SAKU
 		currentState:            controller.StateInitial,
 		Logger:                  logger,
 		CurrentNeighbors:        NewNeighborSet(),
-		nftablesConnector:       nftables.NewDefaultConnector(logger),
+		NftablesConnector:       nftables.NewDefaultConnector(logger),
 		bgpdConnector:           vtysh.NewDefaultBGPdConnector(logger),
 		processControlConnector: process.NewDefaultConnector(logger),
 		mariaDBConnector:        mariadb.NewDefaultConnector(logger),
