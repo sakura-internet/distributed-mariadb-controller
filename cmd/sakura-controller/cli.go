@@ -19,6 +19,8 @@ var (
 	HTTPAPIServerPortFlag int
 	// PrometheusExporterPortFlag is a cli-flag that specifies the port the prometheus exporter listens.
 	PrometheusExporterPortFlag int
+	// DBReplicaSourcePortFlag is a cli-flag that specifies the port of primary as replication source.
+	DBReplicaSourcePortFlag int
 
 	// EnablePrometheusExporterFlag is a cli-flag that enables the prometheus exporter.
 	EnablePrometheusExporterFlag bool
@@ -37,6 +39,7 @@ func parseAllFlags(args []string) error {
 	fs.IntVar(&MainPollingSpanSecondFlag, "main-polling-span-second", 4, "the span seconds of the loop in main.go")
 	fs.IntVar(&PrometheusExporterPortFlag, "prometheus-exporter-port", 50505, "the port the prometheus exporter listens")
 	fs.IntVar(&HTTPAPIServerPortFlag, "http-api-server-port", 54545, "the port the http api server listens")
+	fs.IntVar(&DBReplicaSourcePortFlag, "db-replica-source-port", 3306, "the port of primary as replication source")
 
 	fs.BoolVar(&EnablePrometheusExporterFlag, "prometheus-exporter", true, "enables the prometheus exporter")
 	fs.BoolVar(&EnableHTTPAPIFlag, "http-api", true, "enables the http api server")

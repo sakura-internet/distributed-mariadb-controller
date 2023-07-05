@@ -79,6 +79,8 @@ func main() {
 		c.MariaDBReplicaPassword = dbReplicaPassword
 	}
 
+	c.MariaDBReplicaSourcePort = DBReplicaSourcePortFlag
+
 	wg := new(sync.WaitGroup)
 
 	wg.Add(1)
