@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	googlenftables "github.com/google/nftables"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
@@ -56,8 +57,14 @@ func main() {
 
 	// for controlling the traffics that they're to the DB server port.
 	// the function returns nil if the expected chain is already exist.
-	if err := createNftablesChain(logger); err != nil {
-		panic(err)
+	if NftablesModeFlag == "nftcommand" {
+		if err := createNftablesChain(logger); err != nil {
+			panic(err)
+		}
+	} else {
+		if err := createNftablesChainWithLibrary(logger); err != nil {
+			panic(err)
+		}
 	}
 
 	c := sakura.NewSAKURAController(logger)
@@ -222,21 +229,73 @@ waitLoop:
 	}
 }
 
+const mariaDBNftablesChainName = "mariadb"
+
 // createNftablesChain tries to create an nftables chain on filter table.
 func createNftablesChain(
 	logger *slog.Logger,
 ) error {
-	const (
-		chainName = "mariadb"
-	)
 	// nft add chain comand returns ok if the chain is already exist.
-	cmd := fmt.Sprintf("nft add chain filter %s { type filter hook input priority 0\\; }", chainName)
+	cmd := fmt.Sprintf("nft add chain filter %s { type filter hook input priority 0\\; }", mariaDBNftablesChainName)
 	logger.Info("execute command", "command", cmd, "callerFn", "createNftablesChain")
 	if _, err := bash.RunCommand(cmd); err != nil {
 		return fmt.Errorf("failed to add nft chain: %w", err)
 	}
 
 	return nil
+}
+
+// createNftablesChainWithLibrary tries to create an nftables chain on filter table.
+func createNftablesChainWithLibrary(
+	logger *slog.Logger,
+) (err error) {
+	const (
+		chainName = "mariadb"
+	)
+
+	c, err := googlenftables.New()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		err = c.CloseLasting()
+	}()
+
+	chains, err := c.ListChains()
+	if err != nil {
+		return err
+	}
+
+	mariaDBChainFound := false
+	for _, chain := range chains {
+		mariaDBChainFound = mariaDBChainFound || chain.Name == mariaDBNftablesChainName
+	}
+
+	if mariaDBChainFound {
+		return nil
+	}
+
+	table := googlenftables.Table{
+		Name:   "filter",
+		Family: googlenftables.TableFamilyIPv4,
+	}
+	policy := googlenftables.ChainPolicyAccept
+	chain := googlenftables.Chain{
+		Name:     mariaDBNftablesChainName,
+		Table:    &table,
+		Hooknum:  googlenftables.ChainHookInput,
+		Priority: googlenftables.ChainPriorityFilter,
+		Type:     googlenftables.ChainTypeFilter,
+		Policy:   &policy,
+	}
+	c.AddChain(&chain)
+
+	if err := c.Flush(); err != nil {
+		return err
+	}
+
+	return err
 }
 
 // getEth0NetIFAddress tries to get the IP address of the eth0 I/F using Netlink messages.

@@ -5,45 +5,27 @@ import (
 )
 
 func NewGoogleNftablesConnector() Connector {
-	conn, err := nftables.New()
-	if err != nil {
-		panic("failed to create a new netlink connection")
-	}
-	return &GoogleNftablesConnector{
-		conn: conn,
-	}
+	return &GoogleNftablesConnector{}
 }
 
 type GoogleNftablesConnector struct {
-	conn *nftables.Conn
 }
 
 // AddRule implements Connector
-func (c *GoogleNftablesConnector) AddRule(tableName string, chainName string, matches []Match, statement Statement) error {
-	chain := nftables.Chain{
-		Name: chainName,
-	}
-	table := nftables.Table{
-		Name: tableName,
-	}
-	rule := nftables.Rule{
-		Table: &table,
-		Chain: &chain,
+func (c *GoogleNftablesConnector) AddRule(tableName string, chainName string, matches []Match, statement Statement) (err error) {
+	conn, err := nftables.New()
+	if err != nil {
+		return err
 	}
 
-	_ = c.conn.AddRule(&rule)
-	return nil
+	defer func() {
+		err = conn.CloseLasting()
+	}()
+
+	return err
 }
 
 // FlushChain implements Connector
 func (c *GoogleNftablesConnector) FlushChain(tableName string, chainName string) error {
-	chain := nftables.Chain{
-		Name: chainName,
-		Table: &nftables.Table{
-			Name: tableName,
-		},
-	}
-
-	c.conn.FlushChain(&chain)
 	return nil
 }
