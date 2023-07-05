@@ -12,7 +12,6 @@ const (
 	// if the counter of the controller overs this, the controller goes panic.
 	replicationStatusCheckThreshold = 20
 
-	mariaDBMasterDefaultPort = 13306
 	mariaDBMasterDefaultUser = "repl"
 )
 
@@ -62,7 +61,7 @@ func (c *SAKURAController) triggerRunOnStateChangesToReplica() error {
 	primaryNode := c.CurrentNeighbors.NeighborMatrix[controller.StatePrimary][0]
 	master := mariadb.MasterInstance{
 		Host:     primaryNode.Address,
-		Port:     mariaDBMasterDefaultPort,
+		Port:     c.MariaDBReplicaSourcePort,
 		User:     mariaDBMasterDefaultUser,
 		Password: c.MariaDBReplicaPassword,
 		UseGTID:  mariadb.MasterUseGTIDValueCurrentPos,
@@ -98,7 +97,6 @@ func (c *SAKURAController) triggerRunOnStateChangesToReplica() error {
 func (c *SAKURAController) triggerRunOnStateKeepsReplica() error {
 	if c.replicationStatusCheckFailCount >= replicationStatusCheckThreshold {
 		// we should manually operate the case for recovering.
-		// ref: https://github.sakura.codes/ohkubo/sacloud-multi-az-database/issues/28
 		return fmt.Errorf("reached the maximum retry limit for replication")
 	}
 

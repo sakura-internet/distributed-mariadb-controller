@@ -50,6 +50,8 @@ type SAKURAController struct {
 	m sync.RWMutex
 	// HostAddress is an IP address of the eth0.
 	HostAddress string
+	// DBReplicaSourcePort is the port of primary as replication source.
+	MariaDBReplicaSourcePort int
 	// MariaDBReplicaPassword is credential used by replica to establish replication link for primary
 	MariaDBReplicaPassword string
 	// replicationStatusCheckFailCount is a counter of the MariaDB's replication status checker in replica state.
