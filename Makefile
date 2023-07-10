@@ -22,3 +22,11 @@ vet:
 .PHONY: sakura-build
 sakura-build:
 	go build -o bin/sakura-controller ./cmd/sakura-controller
+
+.PHONY: check-license
+check-license:
+	go-licenses check ./cmd/sakura-controller
+
+.PHONY: tool
+tool:
+	go install github.com/google/go-licenses@latest
