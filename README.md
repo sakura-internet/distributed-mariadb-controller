@@ -12,6 +12,11 @@ BGPをコントロールプレーンとして使用し、データ不整合の�
 
 https://knowledge.sakura.ad.jp/35102/
 
+## インストール
+
+- [クイックスタートガイド](docs/quick-start-guide.md)
+  - Sakura-DBCを最小限動作させる手順についてはこちらを参照してください
+
 ## ライセンス
 
 SAKURA Distributed MariaDB Controller Copyright (C) 2023 [The Sakura-DBC Authors](AUTHORS).
