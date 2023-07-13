@@ -16,8 +16,9 @@ https://knowledge.sakura.ad.jp/35102/
 
 - [クイックスタートガイド](docs/quick-start-guide.md)
   - Sakura-DBCを最小限動作させる手順についてはこちらを参照してください
-- [セキュアオペレーションガイド](docs/secure-operation.md)
+- [セキュアコンフィグレーションガイド](docs/secure-configuration.md)
   - Sakura-DBCをセキュアに動作させるための設定例はこちらを参照してください
+  - クイックスタートガイドと併せて実施することを強く推奨します
 
 ## ライセンス
 

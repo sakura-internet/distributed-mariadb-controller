@@ -1,4 +1,4 @@
-# SAKURA Distributed MariaDB Controller(Sakura-DBC) セキュアオペレーションガイド
+# SAKURA Distributed MariaDB Controller(Sakura-DBC) セキュアコンフィグレーションガイド
 
 ## 概要
 
