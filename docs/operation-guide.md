@@ -10,19 +10,30 @@ Sakura-DBCは、内部的に以下の4つの状態を持ち、状況に応じて
 
 - fault状態
   - DBサーバとしての機能を停止している状態
-  - 起動直後やネットワーク分断を検知した場合、デュアルprimaryを検知した場合、その他エラーが発生した場合この状態に遷移する
-  - また、対向のDBサーバがcandidateやreplica状態の場合、それがprimaryに遷移するのを待つために、自身はfault状態にとどまる
+  - 以下の場合にこの状態に遷移する
+    - 起動直後
+    - ネットワーク分断を検知した場合
+    - デュアルprimary状態を検知した場合
+    - 実行したコマンドがエラーとなった場合
+    - 自身がfault状態で、対向のDBサーバがcandidateやreplica状態の場合
+    - (対向のDBサーバがprimaryに遷移するのを待つためfault状態にとどまる)
 - candidate状態
   - primaryに遷移しようとしている状態
   - 対向DBサーバと同時にprimary(デュアルprimary)とならないよう、一時的にこの状態に遷移する
+  - 以下の場合にこの状態に遷移する
+    - 自身がfault、もしくはreplica状態において、対向DBサーバがfaultになった場合
 - primary状態
   - primaryデータベースとして動作している状態
   - クライアントからのDB接続を受け付け、DBリクエストを処理できる状態
   - MariaDBはread_only=0に設定し、3306番ポートへの接続を許可するnftablesルールを設定する
+  - 以下の場合にこの状態に遷移する
+    - 自身がcandidateになった後、対向DBサーバがcandidate、もしくはprimaryでない場合
 - replica状態
   - replicaデータベースとして動作している状態
   - primaryに対してレプリケーションを張り、更新データを受信している状態
   - MariaDBはread_only=1に設定し、3306番ポートへの接続を拒否するnftablesルールを設定する
+  - 以下の場合にこの状態に遷移する
+    - 自身がfaultの状態で、対向DBサーバがprimaryの場合
 
 ## BGP経路の属性
 
@@ -138,3 +149,35 @@ Sakura-DBCを停止するには以下のようにコマンドを入力します�
  Main PID: 694 (code=exited, status=0/SUCCESS)
 <snip>
 ```
+
+## ログレベルの変更方法
+
+[クイックスタートガイド](quick-start-guide.md)の手順では、通常の運用において推奨されるinfoログレベルにて設定するようになっています。
+ログレベルを変更するには、以下のようにします。
+
+```
+vi /etc/systemd/system/sakura-controller.service
+
+! infoになっている部分を変更します
+ExecStart = /root/distributed-mariadb-controller/bin/sakura-controller --log-level info --db-repilica-password-filepath /root/.db-replica-password
+```
+
+systemdに反映し、Sakura-DBCを再起動します。
+
+```
+systemctl daemon-reload
+systemctl restart sakura-controller
+```
+
+指定可能なログレベルと、各ログレベルにおける出力の指針は以下の通りです。
+
+- debug
+  - 開発中や異常発生時に、デバッグを行う必要がある場合のログレベル
+  - ソースコードの実行パスを必要十分に追える粒度での外部インターフェイスの振る舞い
+  - 内部状態、意思決定、全ての実行コマンド(作用/副作用のないものも含め)を出力
+- info
+  - 主要な状態遷移、主要な意思決定、作用/副作用の発生する実行コマンドを出力
+- warning
+  - サービス停止には至らないが、例外ケースが発生するなど1営業日程度でオペレータの確認を要するログ
+- error
+  - サービス停止に至る、もしくはその可能性が高い異常ケースで、直ちにオペレータの確認を要するログ
