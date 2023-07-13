@@ -20,7 +20,8 @@ Sakura-DBC、および関連ソフトウェアが利用するポートは以下�
 | 50505 | sakura-controller | Prometheus exporter | Metrics取集元であるPrometheusサーバ |
 | 54545 | sakura-controller | GSLBヘルスチェック | GSLBヘルスチェック元 |
 
-※ sakura-controllerはnftablesを用いて、3306番ポートのアクセス許可/拒否ルールを設定します。
+※ sakura-controllerは、nftablesを用いて3306番ポートのアクセス許可/拒否ルールを設定するため、
+他のポートのアクセス制限についてもnftablesを使用して設定を行います
 
 ## nftablesの設定例
 
@@ -72,4 +73,18 @@ table ip filter {
         iifname "eth0" ip saddr @bgp_allow_src tcp dport 179 accept
         iifname "eth0" tcp dport 179 drop
     }
+}
+```
+
+ルールを反映させます。
+
+```
+systemctl enable nftables
+systemctl restart nftables
+```
+
+ルールが反映されたか確認します。
+
+```
+nft list ruleset
 ```
