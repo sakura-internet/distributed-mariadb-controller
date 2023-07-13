@@ -19,6 +19,8 @@ https://knowledge.sakura.ad.jp/35102/
 - [セキュアコンフィグレーションガイド](docs/secure-configuration.md)
   - Sakura-DBCをセキュアに動作させるための設定例はこちらを参照してください
   - クイックスタートガイドと併せて実施することを強く推奨します
+- [オペレーションガイド](docs/operation-guide.md)
+  - Sakura-DBCの動作確認方法、操作方法についてはこちらを参照してください
 
 ## ライセンス
 
