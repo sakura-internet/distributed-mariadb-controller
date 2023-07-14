@@ -21,6 +21,8 @@ https://knowledge.sakura.ad.jp/35102/
   - クイックスタートガイドと併せて実施することを強く推奨します
 - [オペレーションガイド](docs/operation-guide.md)
   - Sakura-DBCの動作確認方法、操作方法についてはこちらを参照してください
+- [Prometheusセットアップガイド](docs/prometheus-setup.md)
+  - Prometheusを用いてSakura-DBCのモニタリングを行う設定例はこちらを参照してください
 
 ## ライセンス
 
