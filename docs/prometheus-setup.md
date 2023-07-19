@@ -1,10 +1,8 @@
-# Prometheusセットアップガイド
+# SAKURA Distributed MariaDB Controller(Sakura-DBC) Prometheusセットアップガイド
 
 ## 概要
 
-Prometheusを用いてSakura-DBCをモニタリングする設定例を紹介します。
-
-本ドキュメントでは、異常検知時にSlack通知する手順を記載しています
+Prometheusを用いてSakura-DBCをモニタリングし、異常検知時にSlack通知する手順を紹介します。
 
 ## 事前準備
 
