@@ -4,6 +4,8 @@
 
 Prometheusを用いてSakura-DBCをモニタリングする設定例を紹介します。
 
+本ドキュメントでは、異常検知時にSlack通知する手順を記載しています
+
 ## 事前準備
 
 あらかじめ、以下を準備してください。
@@ -11,7 +13,6 @@ Prometheusを用いてSakura-DBCをモニタリングする設定例を紹介し
 - Prometheusを動作させるサーバ
   - 本ドキュメントでは、Rocky Linux 8を例に説明します
 - Slack通知用のチャンネル
-  - 本ドキュメントでは、異常検知時にSlack通知する手順を記載しています
 - Slack通知用のIncoming WebHook URL
 
 ## Prometheusのインストール
@@ -95,7 +96,7 @@ groups:
 
 ```
 global:
-  slack_api_url: "https://hooks.slack.com/services/xxx/yyy/zzz" ← SlackのIncoming WebHook URL
+  slack_api_url: "https://hooks.slack.com/services/xxx/yyy/zzz" ← SlackのIncoming WebHook URLを記入
 route:
   receiver: 'slack-notifications'
   group_wait: 10s
