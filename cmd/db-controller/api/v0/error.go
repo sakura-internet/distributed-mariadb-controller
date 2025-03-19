@@ -1,4 +1,4 @@
-// Copyright 2023 The distributed-mariadb-controller Authors
+// Copyright 2025 The distributed-mariadb-controller Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nftables
+package v0
 
-const (
-	BuiltinTableFilter = "filter"
-)
+type ErrorResponse struct {
+	Message string `json:"message"`
+}

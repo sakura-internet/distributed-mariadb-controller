@@ -1,4 +1,4 @@
-// Copyright 2023 The distributed-mariadb-controller Authors
+// Copyright 2025 The distributed-mariadb-controller Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,14 +25,20 @@ type FakeNftablesConnector struct {
 }
 
 // AddRule implements nftables.Connector
-func (c *FakeNftablesConnector) AddRule(table string, chain string, matches []Match, statement Statement) error {
+func (c *FakeNftablesConnector) AddRule(chain string, matches []Match, statement statement) error {
 	c.Timestamp["AddRule"] = time.Now()
 	return nil
 }
 
 // FlushChain implements nftables.Connector
-func (c *FakeNftablesConnector) FlushChain(table string, chain string) error {
+func (c *FakeNftablesConnector) FlushChain(chain string) error {
 	c.Timestamp["FlushChain"] = time.Now()
+	return nil
+}
+
+// CreateChain implements nftables.Connector
+func (c *FakeNftablesConnector) CreateChain(chain string) error {
+	c.Timestamp["CreateChain"] = time.Now()
 	return nil
 }
 

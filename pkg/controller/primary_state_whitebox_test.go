@@ -1,4 +1,4 @@
-// Copyright 2023 The distributed-mariadb-controller Authors
+// Copyright 2025 The distributed-mariadb-controller Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,46 +12,43 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sakura
+package controller
 
 import (
-	"os"
 	"testing"
 
-	"github.com/sakura-internet/distributed-mariadb-controller/pkg/controller"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/mariadb"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/exp/slog"
 )
 
 func TestDecideNextStateOnPrimary_MariaDBIsUnhealthy(t *testing.T) {
-	ns := NewNeighborSet()
+	c := _newFakeController()
+	c.currentMariaDBHealth = dbHealthCheckResultNG
 
-	logger := slog.New(slog.NewJSONHandler(os.Stderr))
-	nextState := decideNextStateOnPrimary(logger, ns, MariaDBHealthCheckResultNG)
-	assert.Equal(t, controller.StateFault, nextState)
+	nextState := c.decideNextStateOnPrimary()
+	assert.Equal(t, StateFault, nextState)
 }
 
 func TestDecideNextStateOnPrimary_InDualPrimarySituation(t *testing.T) {
-	ns := NewNeighborSet()
-	ns.NeighborMatrix[controller.StatePrimary] = append(ns.NeighborMatrix[controller.StatePrimary], Neighbor{})
+	c := _newFakeController()
+	c.currentNeighbors.neighborMatrix[StatePrimary] = []neighbor{{}}
+	c.currentMariaDBHealth = dbHealthCheckResultOK
 
-	logger := slog.New(slog.NewJSONHandler(os.Stderr))
-	nextState := decideNextStateOnPrimary(logger, ns, MariaDBHealthCheckResultOK)
-	assert.Equal(t, controller.StateFault, nextState)
+	nextState := c.decideNextStateOnPrimary()
+	assert.Equal(t, StateFault, nextState)
 }
 
 func TestDecideNextStateOnPrimary_OKPath(t *testing.T) {
-	ns := NewNeighborSet()
-	ns.NeighborMatrix[controller.StateReplica] = append(ns.NeighborMatrix[controller.StateReplica], Neighbor{})
+	c := _newFakeController()
+	c.currentNeighbors.neighborMatrix[StateReplica] = []neighbor{{}}
+	c.currentMariaDBHealth = dbHealthCheckResultOK
 
-	logger := slog.New(slog.NewJSONHandler(os.Stderr))
-	nextState := decideNextStateOnPrimary(logger, ns, MariaDBHealthCheckResultOK)
-	assert.Equal(t, controller.StatePrimary, nextState)
+	nextState := c.decideNextStateOnPrimary()
+	assert.Equal(t, StatePrimary, nextState)
 }
 
 func TestTriggerRunOnStateKeepsPrimary_WriteTestDataFailPath(t *testing.T) {
-	c := _newFakeSAKURAController()
+	c := _newFakeController()
 	// inject the mariadb connector that fails to write testdata.
 	c.mariaDBConnector = mariadb.NewFakeMariaDBFailWriteTestDataConnector()
 
@@ -63,7 +60,7 @@ func TestTriggerRunOnStateKeepsPrimary_WriteTestDataFailPath(t *testing.T) {
 }
 
 func TestTriggerRunOnStateKeepsPrimary_WriteTestDataFailedCountOversThreshold(t *testing.T) {
-	c := _newFakeSAKURAController()
+	c := _newFakeController()
 	// inject the mariadb connector that fails to write testdata.
 	c.mariaDBConnector = mariadb.NewFakeMariaDBFailWriteTestDataConnector()
 	c.writeTestDataFailCount = writeTestDataFailCountThreshold
@@ -73,7 +70,7 @@ func TestTriggerRunOnStateKeepsPrimary_WriteTestDataFailedCountOversThreshold(t 
 }
 
 func TestTriggerRunOnStateChangesToPrimary_OKPath(t *testing.T) {
-	c := _newFakeSAKURAController()
+	c := _newFakeController()
 
 	// for checking the triggerRunOnStateChangesToPrimary() resets this count to 0
 	c.writeTestDataFailCount = 5

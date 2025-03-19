@@ -1,4 +1,4 @@
-// Copyright 2023 The distributed-mariadb-controller Authors
+// Copyright 2025 The distributed-mariadb-controller Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ func (c *FakeSystemdConnector) CheckServiceStatus(serviceName string) error {
 }
 
 // StartService implements systemd.Connector
-func (c *FakeSystemdConnector) StartService(serviceName string, preHook func() error, postHook func() error) error {
+func (c *FakeSystemdConnector) StartService(serviceName string) error {
 	c.ServiceStarted[serviceName] = true
 	c.Timestamp["StartService"] = time.Now()
 	return nil
@@ -43,6 +43,13 @@ func (c *FakeSystemdConnector) StartService(serviceName string, preHook func() e
 func (c *FakeSystemdConnector) StopService(serviceName string) error {
 	c.ServiceStarted[serviceName] = false
 	c.Timestamp["StopService"] = time.Now()
+	return nil
+}
+
+// KillService implements systemd.Connector
+func (c *FakeSystemdConnector) KillService(serviceName string) error {
+	c.ServiceStarted[serviceName] = false
+	c.Timestamp["KillService"] = time.Now()
 	return nil
 }
 

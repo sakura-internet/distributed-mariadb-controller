@@ -1,4 +1,4 @@
-// Copyright 2023 The distributed-mariadb-controller Authors
+// Copyright 2025 The distributed-mariadb-controller Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,75 +16,63 @@ package systemd
 
 import (
 	"fmt"
+	"time"
 
-	"github.com/sakura-internet/distributed-mariadb-controller/pkg/bash"
+	"github.com/sakura-internet/distributed-mariadb-controller/pkg/command"
 	"golang.org/x/exp/slog"
+)
+
+const (
+	systemctlCommandTimeout = 60 * time.Second
 )
 
 // Connector is an interface that communicates with systemd.
 type Connector interface {
 	// StartSerivce starts a systemd service.
-	// preHook are triggered before starting a service.
-	// postHook are triggered after starting a service.
-	StartService(
-		serviceName string,
-		preHook func() error,
-		postHook func() error,
-	) error
+	StartService(serviceName string) error
 
-	StopService(
-		serviceName string,
-	) error
+	// StopService stops a systemd service.
+	StopService(serviceName string) error
+
+	// KillService kills a systemd service.
+	KillService(serviceName string) error
+
 	// CheckServiceStatus checks the status of a systemd service.
-	CheckServiceStatus(
-		serviceName string,
-	) error
+	CheckServiceStatus(serviceName string) error
+}
+
+// systemCtlConnector is a default implementation of Connector.
+// this impl uses "systemctl" commands to interact with systemd.
+type systemCtlConnector struct {
+	logger *slog.Logger
 }
 
 func NewDefaultConnector(logger *slog.Logger) Connector {
-	return &SystemCtlConnector{Logger: logger}
-}
-
-// SystemCtlConnector is a default implementation of Connector.
-// this impl uses "systemctl" commands to interact with systemd.
-type SystemCtlConnector struct {
-	Logger *slog.Logger
+	return &systemCtlConnector{logger: logger}
 }
 
 // StartSerivce implements Connector
-func (c *SystemCtlConnector) StartService(
+func (c *systemCtlConnector) StartService(
 	serviceName string,
-	preHook func() error,
-	postHook func() error,
 ) error {
-	if preHook != nil {
-		if err := preHook(); err != nil {
-			return err
-		}
-	}
-
-	cmd := fmt.Sprintf("systemctl start %s", serviceName)
-	c.Logger.Info("execute command", "command", cmd, "callerFn", "CheckServiceStatus")
-	if _, err := bash.RunCommand(cmd); err != nil {
+	name := "systemctl"
+	args := []string{"start", serviceName}
+	c.logger.Info("execute command", "name", name, "args", args)
+	if _, err := command.RunWithTimeout(systemctlCommandTimeout, name, args...); err != nil {
 		return fmt.Errorf("failed to start %s service: %w", serviceName, err)
-	}
-
-	if postHook != nil {
-		if err := postHook(); err != nil {
-			return err
-		}
 	}
 
 	return nil
 }
 
 // CheckServiceStatus implements Connector
-func (c *SystemCtlConnector) CheckServiceStatus(
+func (c *systemCtlConnector) CheckServiceStatus(
 	serviceName string,
 ) error {
-	cmd := fmt.Sprintf("systemctl status %s", serviceName)
-	c.Logger.Debug("execute command", "command", cmd, "callerFn", "CheckServiceStatus")
-	if _, err := bash.RunCommand(cmd); err != nil {
+	name := "systemctl"
+	args := []string{"status", serviceName}
+	c.logger.Debug("execute command", "name", name, "args", args)
+	if _, err := command.RunWithTimeout(systemctlCommandTimeout, name, args...); err != nil {
 		return fmt.Errorf("failed to check %s service: %w", serviceName, err)
 	}
 
@@ -92,13 +80,27 @@ func (c *SystemCtlConnector) CheckServiceStatus(
 }
 
 // StopService implements Connector
-func (c *SystemCtlConnector) StopService(
+func (c *systemCtlConnector) StopService(
 	serviceName string,
 ) error {
-	cmd := fmt.Sprintf("systemctl stop %s", serviceName)
+	name := "systemctl"
+	args := []string{"stop", serviceName}
+	c.logger.Info("execute command", "name", name, "args", args)
+	if _, err := command.RunWithTimeout(systemctlCommandTimeout, name, args...); err != nil {
+		return fmt.Errorf("failed to stop service %s : %w", serviceName, err)
+	}
 
-	c.Logger.Info("execute command", "command", cmd, "callerFn", "StopService")
-	if _, err := bash.RunCommand(cmd); err != nil {
+	return nil
+}
+
+// KillService implements Connector
+func (c *systemCtlConnector) KillService(
+	serviceName string,
+) error {
+	name := "systemctl"
+	args := []string{"kill", "-s", "SIGKILL", serviceName}
+	c.logger.Info("execute command", "name", name, "args", args)
+	if _, err := command.RunWithTimeout(systemctlCommandTimeout, name, args...); err != nil {
 		return fmt.Errorf("failed to stop service %s : %w", serviceName, err)
 	}
 

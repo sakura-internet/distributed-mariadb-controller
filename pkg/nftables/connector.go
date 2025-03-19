@@ -1,4 +1,4 @@
-// Copyright 2023 The distributed-mariadb-controller Authors
+// Copyright 2025 The distributed-mariadb-controller Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,62 +16,79 @@ package nftables
 
 import (
 	"fmt"
-	"strings"
+	"time"
 
-	"github.com/sakura-internet/distributed-mariadb-controller/pkg/bash"
+	"github.com/sakura-internet/distributed-mariadb-controller/pkg/command"
 	"golang.org/x/exp/slog"
+)
+
+const (
+	builtinTableFilter = "filter"
+)
+
+var (
+	nftCommandTimeout = 5 * time.Second
 )
 
 // Connector is an interface that communicates with nftables.
 type Connector interface {
-	FlushChain(
-		table string,
-		chain string,
-	) error
-	AddRule(
-		table string,
-		chain string,
-		matches []Match,
-		statement Statement,
-	) error
+	FlushChain(chain string) error
+	CreateChain(chain string) error
+	AddRule(chain string, matches []Match, statement statement) error
+}
+
+// nftCommandConnector is a default implementation of Connector.
+// this impl uses "nft" commands to interact with nftables.
+type nftCommandConnector struct {
+	logger *slog.Logger
 }
 
 func NewDefaultConnector(logger *slog.Logger) Connector {
-	return &NftCommandConnector{Logger: logger}
-}
-
-// NftComandConnector is a default implementation of Connector.
-// this impl uses "nft" commands to interact with nftables.
-type NftCommandConnector struct {
-	Logger *slog.Logger
+	return &nftCommandConnector{logger: logger}
 }
 
 // AddRule implements Connector
-func (c *NftCommandConnector) AddRule(
-	table string, chain string, matches []Match, statement Statement) error {
-	matchesStr := make([]string, len(matches))
-	for i := range matches {
-		matchesStr[i] = string(matches[i])
+func (c *nftCommandConnector) AddRule(
+	chain string, matches []Match, stmt statement,
+) error {
+	name := "nft"
+	args := []string{"add", "rule", builtinTableFilter, chain}
+	for _, match := range matches {
+		args = append(args, match...)
 	}
-
-	cmd := fmt.Sprintf("nft add rule %s %s %s %s", table, chain, strings.Join(matchesStr, " "), statement)
-	c.Logger.Info("execute command", "command", cmd, "callerFn", "AddRule")
-	if _, err := bash.RunCommand(cmd); err != nil {
-		return fmt.Errorf("failed to add rule to chain %s on table %s: %w", chain, table, err)
+	args = append(args, stmt...)
+	c.logger.Info("execute command", "name", name, "args", args)
+	if _, err := command.RunWithTimeout(nftCommandTimeout, name, args...); err != nil {
+		return fmt.Errorf("failed to add rule to chain %s on table %s: %w", chain, builtinTableFilter, err)
 	}
 
 	return nil
 }
 
 // FlushChain implements Connector
-func (c *NftCommandConnector) FlushChain(
-	table string,
+func (c *nftCommandConnector) FlushChain(
 	chain string,
 ) error {
-	cmd := fmt.Sprintf("nft flush chain %s %s", table, chain)
-	c.Logger.Info("execute command", "command", cmd, "callerFn", "FlushChain")
-	if _, err := bash.RunCommand(cmd); err != nil {
-		return fmt.Errorf("failed to flush chain %s on table %s: %w", chain, table, err)
+	name := "nft"
+	args := []string{"flush", "chain", builtinTableFilter, chain}
+	c.logger.Info("execute command", "name", name, "args", args)
+	if _, err := command.RunWithTimeout(nftCommandTimeout, name, args...); err != nil {
+		return fmt.Errorf("failed to flush chain %s on table %s: %w", chain, builtinTableFilter, err)
+	}
+
+	return nil
+}
+
+// CreateChain implements Connector
+func (c *nftCommandConnector) CreateChain(
+	chain string,
+) error {
+	// nft add chain comand returns ok if the chain is already exist.
+	name := "nft"
+	args := []string{"add", "chain", builtinTableFilter, chain, "{ type filter hook input priority 0; }"}
+	c.logger.Info("execute command", "name", name, "args", args)
+	if _, err := command.RunWithTimeout(nftCommandTimeout, name, args...); err != nil {
+		return fmt.Errorf("failed to add nft chain: %w", err)
 	}
 
 	return nil

@@ -1,4 +1,4 @@
-// Copyright 2023 The distributed-mariadb-controller Authors
+// Copyright 2025 The distributed-mariadb-controller Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/signal"
@@ -32,10 +31,9 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	apiv0 "github.com/sakura-internet/distributed-mariadb-controller/cmd/sakura-controller/api/v0"
-	"github.com/sakura-internet/distributed-mariadb-controller/pkg/bash"
+	apiv0 "github.com/sakura-internet/distributed-mariadb-controller/cmd/db-controller/api/v0"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/controller"
-	"github.com/sakura-internet/distributed-mariadb-controller/pkg/controller/sakura"
+	"github.com/sakura-internet/distributed-mariadb-controller/pkg/nftables"
 	"github.com/vishvananda/netlink"
 
 	"golang.org/x/exp/rand"
@@ -45,8 +43,6 @@ import (
 func main() {
 	rand.Seed(uint64(time.Now().UnixNano()))
 
-	ctx, cancel := context.WithCancel(context.Background())
-
 	if err := parseAllFlags(os.Args[1:]); err != nil {
 		panic(err)
 	}
@@ -54,14 +50,14 @@ func main() {
 		panic(err)
 	}
 
-	logger := setupGlobalLogger(os.Stderr, LogLevelFlag)
+	logger := setupGlobalLogger(os.Stderr, logLevelFlag)
 
 	// mkdir for lock file
-	if err := os.MkdirAll(filepath.Dir(LockFilePathFlag), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(lockFilePathFlag), 0o755); err != nil {
 		panic(err)
 	}
 
-	lockf, err := tryToGetTheExclusiveLockWithoutBlocking(LockFilePathFlag)
+	lockf, err := tryToGetTheExclusiveLockWithoutBlocking(lockFilePathFlag)
 	if err != nil {
 		panic(err)
 	}
@@ -69,63 +65,66 @@ func main() {
 
 	// for controlling the traffics that they're to the DB server port.
 	// the function returns nil if the expected chain is already exist.
-	if err := createNftablesChain(logger); err != nil {
+	nftConnect := nftables.NewDefaultConnector(logger)
+	if err := nftConnect.CreateChain(chainNameForDBAclFlag); err != nil {
 		panic(err)
 	}
 
-	c := sakura.NewSAKURAController(logger)
-
-	{
-		eth0Address, err := getEth0NetIFAddress()
-		if err != nil {
-			panic(err)
-		}
-
-		logger.Debug("eth0 address", "address", eth0Address)
-		c.HostAddress = eth0Address
+	// prepare controller instance
+	myHostAddress, err := getNetIFAddress(globalInterfaceNameFlag)
+	if err != nil {
+		panic(err)
 	}
-	{
-		dbReplicaPassword, err := readDBReplicaPassword(DBReplicaPasswordFilePathFlag)
-		if err != nil {
-			panic(err)
-		}
+	logger.Debug("host address", "address", myHostAddress)
 
-		c.MariaDBReplicaPassword = dbReplicaPassword
+	dbReplicaPassword, err := readDBReplicaPassword(dbReplicaPasswordFilePathFlag)
+	if err != nil {
+		panic(err)
 	}
 
-	c.MariaDBReplicaSourcePort = DBReplicaSourcePortFlag
+	c := controller.NewController(
+		logger,
+		globalInterfaceNameFlag,
+		myHostAddress,
+		uint16(dbServingPortFlag),
+		dbReplicaUserNameFlag,
+		dbReplicaPassword,
+		uint16(dbReplicaSourcePortFlag),
+		chainNameForDBAclFlag,
+	)
+
+	// start goroutines
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	wg := new(sync.WaitGroup)
 
 	wg.Add(1)
-	go func(ctx context.Context, wg *sync.WaitGroup, c *sakura.SAKURAController) {
+	go func(ctx context.Context, wg *sync.WaitGroup, c *controller.Controller) {
 		defer wg.Done()
-		controller.Start(ctx, logger, controller.Controller(c), time.Second*time.Duration(MainPollingSpanSecondFlag))
+		c.Start(ctx, time.Second*time.Duration(mainPollingSpanSecondFlag))
 	}(ctx, wg, c)
 
-	if EnablePrometheusExporterFlag {
+	if enablePrometheusExporterFlag {
 		wg.Add(1)
 		go startPrometheusExporterServer(ctx, wg)
 	}
 
-	if EnableHTTPAPIFlag {
+	if enableHTTPAPIFlag {
 		wg.Add(1)
 		go startHTTPAPIServer(ctx, wg, c)
 	}
 
+	// wait for receive signal
 	signal.Ignore(syscall.SIGHUP, syscall.SIGPIPE)
 	stopSigCh := make(chan os.Signal, 3)
 	signal.Notify(stopSigCh, os.Interrupt, syscall.SIGQUIT, syscall.SIGTERM)
 
-mainLoop:
-	for range stopSigCh {
-		logger.Info("got stop signal. exiting.")
+	<-stopSigCh
+	logger.Info("got stop signal. exiting.")
 
-		// for stopping all goroutine.
-		cancel()
-		break mainLoop
-	}
-
+	// for stopping all goroutine.
+	cancel()
 	wg.Wait()
 
 	logger.Info("db-controller exited. see you again, bye.")
@@ -141,7 +140,7 @@ func startPrometheusExporterServer(
 	// Setup
 	e := echo.New()
 
-	switch LogLevelFlag {
+	switch logLevelFlag {
 	case "info":
 		e.Logger.SetLevel(log.INFO)
 	case "debug":
@@ -153,11 +152,11 @@ func startPrometheusExporterServer(
 		e.Logger.SetLevel(log.ERROR)
 	}
 
-	reg := sakura.NewPrometheusMetricRegistry()
+	reg := controller.NewPrometheusMetricRegistry()
 	e.GET("/metrics", echo.WrapHandler(promhttp.HandlerFor(reg, promhttp.HandlerOpts{})))
 
 	// Start server
-	addr := fmt.Sprintf(":%d", PrometheusExporterPortFlag)
+	addr := fmt.Sprintf(":%d", prometheusExporterPortFlag)
 
 	ch := make(chan bool, 1)
 	go func(ch chan<- bool) {
@@ -168,24 +167,18 @@ func startPrometheusExporterServer(
 		ch <- true
 	}(ch)
 
-waitLoop:
-	for {
-		select {
-		case <-ctx.Done():
-			if err := e.Shutdown(ctx); err != nil {
-				e.Logger.Fatal(err)
-			}
-			<-ch
-			break waitLoop
-		}
+	<-ctx.Done()
+	if err := e.Shutdown(ctx); err != nil {
+		e.Logger.Fatal(err)
 	}
+	<-ch
 }
 
 // startHTTPAPIServer starts the HTTP API server that serves the controller status responder.
 func startHTTPAPIServer(
 	ctx context.Context,
 	wg *sync.WaitGroup,
-	c *sakura.SAKURAController,
+	c *controller.Controller,
 ) {
 	defer wg.Done()
 
@@ -193,7 +186,7 @@ func startHTTPAPIServer(
 	e := echo.New()
 	e.Use(apiv0.UseControllerState(c))
 
-	switch LogLevelFlag {
+	switch logLevelFlag {
 	case "info":
 		e.Logger.SetLevel(log.INFO)
 	case "debug":
@@ -209,7 +202,7 @@ func startHTTPAPIServer(
 	e.GET("/healthcheck", apiv0.GSLBHealthCheckEndpoint)
 	e.GET("/status", apiv0.GetDBControllerStatus)
 	// Start server
-	addr := fmt.Sprintf(":%d", HTTPAPIServerPortFlag)
+	addr := fmt.Sprintf(":%d", httpAPIServerPortFlag)
 
 	ch := make(chan bool, 1)
 	go func(ch chan<- bool) {
@@ -220,39 +213,16 @@ func startHTTPAPIServer(
 		ch <- true
 	}(ch)
 
-waitLoop:
-	for {
-		select {
-		case <-ctx.Done():
-			if err := e.Shutdown(ctx); err != nil {
-				e.Logger.Fatal(err)
-			}
-			<-ch
-			break waitLoop
-		}
+	<-ctx.Done()
+	if err := e.Shutdown(ctx); err != nil {
+		e.Logger.Fatal(err)
 	}
+	<-ch
 }
 
-// createNftablesChain tries to create an nftables chain on filter table.
-func createNftablesChain(
-	logger *slog.Logger,
-) error {
-	const (
-		chainName = "mariadb"
-	)
-	// nft add chain comand returns ok if the chain is already exist.
-	cmd := fmt.Sprintf("nft add chain filter %s { type filter hook input priority 0\\; }", chainName)
-	logger.Info("execute command", "command", cmd, "callerFn", "createNftablesChain")
-	if _, err := bash.RunCommand(cmd); err != nil {
-		return fmt.Errorf("failed to add nft chain: %w", err)
-	}
-
-	return nil
-}
-
-// getEth0NetIFAddress tries to get the IP address of the eth0 I/F using Netlink messages.
-func getEth0NetIFAddress() (string, error) {
-	eth, err := netlink.LinkByName("eth0")
+// getNetIFAddress tries to get the IP address of the specified interface name I/F using Netlink messages.
+func getNetIFAddress(intfname string) (string, error) {
+	eth, err := netlink.LinkByName(intfname)
 	if err != nil {
 		return "", err
 	}
@@ -263,7 +233,7 @@ func getEth0NetIFAddress() (string, error) {
 	}
 
 	if len(addrs) == 0 {
-		return "", fmt.Errorf("eth0 doesn't have any IP addresses")
+		return "", fmt.Errorf("%s doesn't have any IP addresses", intfname)
 	}
 
 	return addrs[0].IP.String(), nil
@@ -311,7 +281,7 @@ func readDBReplicaPassword(path string) (string, error) {
 	}
 	defer f.Close()
 
-	b, err := ioutil.ReadAll(f)
+	b, err := io.ReadAll(f)
 	if err != nil {
 		return "", err
 	}

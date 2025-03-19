@@ -1,4 +1,4 @@
-// Copyright 2023 The distributed-mariadb-controller Authors
+// Copyright 2025 The distributed-mariadb-controller Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,12 +40,6 @@ func (c *FakeMariaDBConnector) ChangeMasterTo(master MasterInstance) error {
 	return nil
 }
 
-// CheckBoolVariableIsON implements mariadb.Connector
-func (c *FakeMariaDBConnector) CheckBoolVariableIsON(variableName string) bool {
-	c.Timestamp["CheckBoolVariableIsON"] = time.Now()
-	return c.ReadOnlyVariable
-}
-
 // ResetAllReplicas implements mariadb.Connector
 func (c *FakeMariaDBConnector) ResetAllReplicas() error {
 	c.Timestamp["ResetAllRelicas"] = time.Now()
@@ -74,22 +68,23 @@ func (c *FakeMariaDBConnector) StopReplica() error {
 	return nil
 }
 
-// TurnOffBoolVariable implements mariadb.Connector
-func (c *FakeMariaDBConnector) TurnOffBoolVariable(variableName string) error {
-	c.Timestamp[fmt.Sprintf("TurnOffBoolVariable(%s)", variableName)] = time.Now()
-	if variableName == ReadOnlyVariableName {
-		c.ReadOnlyVariable = false
-	}
+// IsReadOnly implements mariadb.Connector
+func (c *FakeMariaDBConnector) IsReadOnly() bool {
+	c.Timestamp["IsReadOnly"] = time.Now()
+	return c.ReadOnlyVariable
+}
 
+// TurnOffReadOnly implements mariadb.Connector
+func (c *FakeMariaDBConnector) TurnOffReadOnly() error {
+	c.Timestamp["TurnOffReadOnly"] = time.Now()
+	c.ReadOnlyVariable = false
 	return nil
 }
 
-// TurnOnBoolVariable implements mariadb.Connector
-func (c *FakeMariaDBConnector) TurnOnBoolVariable(variableName string) error {
-	c.Timestamp[fmt.Sprintf("TurnOnBoolVariable(%s)", variableName)] = time.Now()
-	if variableName == ReadOnlyVariableName {
-		c.ReadOnlyVariable = true
-	}
+// TurnOnReadOnly implements mariadb.Connector
+func (c *FakeMariaDBConnector) TurnOnReadOnly() error {
+	c.Timestamp["TurnOnReadOnly"] = time.Now()
+	c.ReadOnlyVariable = true
 	return nil
 }
 
@@ -130,8 +125,8 @@ func (c *FakeMariaDBFailWriteTestDataConnector) ChangeMasterTo(master MasterInst
 	return nil
 }
 
-// CheckBoolVariableIsON implements mariadb.Connector
-func (c *FakeMariaDBFailWriteTestDataConnector) CheckBoolVariableIsON(variableName string) bool {
+// IsReadOnly implements mariadb.Connector
+func (c *FakeMariaDBFailWriteTestDataConnector) IsReadOnly() bool {
 	return true
 }
 
@@ -160,13 +155,13 @@ func (c *FakeMariaDBFailWriteTestDataConnector) StopReplica() error {
 	return nil
 }
 
-// TurnOffBoolVariable implements mariadb.Connector
-func (c *FakeMariaDBFailWriteTestDataConnector) TurnOffBoolVariable(variableName string) error {
+// TurnOffReadOnly implements mariadb.Connector
+func (c *FakeMariaDBFailWriteTestDataConnector) TurnOffReadOnly() error {
 	return nil
 }
 
-// TurnOnBoolVariable implements mariadb.Connector
-func (c *FakeMariaDBFailWriteTestDataConnector) TurnOnBoolVariable(variableName string) error {
+// TurnOnReadOnly implements mariadb.Connector
+func (c *FakeMariaDBFailWriteTestDataConnector) TurnOnReadOnly() error {
 	return nil
 }
 

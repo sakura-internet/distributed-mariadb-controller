@@ -1,4 +1,4 @@
-// Copyright 2023 The distributed-mariadb-controller Authors
+// Copyright 2025 The distributed-mariadb-controller Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,21 +14,19 @@
 
 package nftables
 
-import "fmt"
+type statement []string
 
-type Statement string
-
-func AcceptStatement() Statement {
-	return Statement("accept")
+func AcceptStatement() statement {
+	return []string{"accept"}
 }
 
-func RejectStatement() Statement {
-	return Statement("reject")
+func RejectStatement() statement {
+	return []string{"reject"}
 }
 
 func RejectStatementWithProto(
 	proto string,
 	protoType string,
-) Statement {
-	return Statement(fmt.Sprintf("reject with %s type %s", proto, protoType))
+) statement {
+	return []string{"reject", "with", proto, "type", protoType}
 }
