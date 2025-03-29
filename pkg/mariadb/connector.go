@@ -16,6 +16,7 @@ package mariadb
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -50,6 +51,10 @@ type Connector interface {
 	CreateIDTable(dbName string, tableName string) error
 	InsertIDRecord(dbName string, tableName string, id int) error
 	DeleteRecords(dbName string, tableName string) error
+
+	// remove master info or relay info
+	RemoveMasterInfo() error
+	RemoveRelayInfo() error
 }
 
 func NewDefaultConnector(logger *slog.Logger) Connector {
@@ -200,6 +205,30 @@ func (c *mySQLCommandConnector) runMysqlCommand(mysqlcmd string) ([]byte, error)
 
 	c.logger.Debug("execute command", "name", name, "args", args)
 	return command.RunWithTimeout(mysqlCommandTimeout, name, args...)
+}
+
+func (c *mySQLCommandConnector) RemoveMasterInfo() error {
+	_, err := os.Stat(MasterInfoFilePath)
+
+	// do nothing if file is not found
+	if err != nil {
+		return nil
+	}
+
+	// delete if file exists
+	return os.Remove(MasterInfoFilePath)
+}
+
+func (c *mySQLCommandConnector) RemoveRelayInfo() error {
+	_, err := os.Stat(RelayInfoFilePath)
+
+	// do nothing if file is not found
+	if err != nil {
+		return nil
+	}
+
+	// delete if file exists
+	return os.Remove(RelayInfoFilePath)
 }
 
 // parseShowReplicaStatusOutput parses the output of the "mysql -e 'show replica status \G'".

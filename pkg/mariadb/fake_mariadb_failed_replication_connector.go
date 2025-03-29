@@ -85,3 +85,13 @@ func (*FakeMariaDBFailedReplicationConnector) DeleteRecords(dbName string, table
 func (*FakeMariaDBFailedReplicationConnector) InsertIDRecord(dbName string, tableName string, id int) error {
 	return nil
 }
+
+// RemoveMasterInfo implements mariadb.Connector
+func (*FakeMariaDBFailedReplicationConnector) RemoveMasterInfo() error {
+	return nil
+}
+
+// RemoveRelayInfo implements mariadb.Connector
+func (*FakeMariaDBFailedReplicationConnector) RemoveRelayInfo() error {
+	return nil
+}

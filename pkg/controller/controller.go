@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"os"
 	"sync"
 	"time"
 
@@ -503,10 +502,10 @@ func (c *Controller) syncReadOnlyVariable(readOnlyToBeTrue bool) error {
 
 // startMariaDBService starts the mariadb service of systemd.
 func (c *Controller) startMariaDBService() error {
-	if err := os.RemoveAll(mariadb.MasterInfoFilePath); err != nil {
+	if err := c.mariaDBConnector.RemoveMasterInfo(); err != nil {
 		return err
 	}
-	if err := os.RemoveAll(mariadb.RelayInfoFilePath); err != nil {
+	if err := c.mariaDBConnector.RemoveRelayInfo(); err != nil {
 		return err
 	}
 	if err := c.systemdConnector.StartService(mariadb.SystemdSerivceName); err != nil {

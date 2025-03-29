@@ -112,6 +112,14 @@ func (c *FakeMariaDBConnector) InsertIDRecord(dbName string, tableName string, i
 	return nil
 }
 
+func (c *FakeMariaDBConnector) RemoveMasterInfo() error {
+	return nil
+}
+
+func (c *FakeMariaDBConnector) RemoveRelayInfo() error {
+	return nil
+}
+
 // FakeMariaDBFailWriteTestDataConnector is the mariadb connector that fails to write testdata.
 type FakeMariaDBFailWriteTestDataConnector struct {
 }
@@ -182,5 +190,13 @@ func (*FakeMariaDBFailWriteTestDataConnector) DeleteRecords(dbName string, table
 
 // InsertIDRecord implements mariadb.Connector
 func (*FakeMariaDBFailWriteTestDataConnector) InsertIDRecord(dbName string, tableName string, id int) error {
+	return nil
+}
+
+func (c *FakeMariaDBFailWriteTestDataConnector) RemoveMasterInfo() error {
+	return nil
+}
+
+func (c *FakeMariaDBFailWriteTestDataConnector) RemoveRelayInfo() error {
 	return nil
 }
