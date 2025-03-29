@@ -15,7 +15,7 @@
 package controller
 
 import (
-	"github.com/sakura-internet/distributed-mariadb-controller/pkg/frrouting/bgpd"
+	"github.com/sakura-internet/distributed-mariadb-controller/pkg/bgpserver"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/mariadb"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/nftables"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/systemd"
@@ -87,9 +87,9 @@ func WithNftablesConnector(connector nftables.Connector) ControllerConfig {
 	}
 }
 
-// WithBGPdConnector generates a config that sets the vtysh.WithBGPdConnector into Controller.
-func WithBGPdConnector(connector bgpd.BGPdConnector) ControllerConfig {
+// WithBgpServerConnector generates a config that sets the bgpserver.Connector into Controller.
+func WithBgpServerConnector(connector bgpserver.Connector) ControllerConfig {
 	return func(c *Controller) {
-		c.bgpdConnector = connector
+		c.bgpServerConnector = connector
 	}
 }

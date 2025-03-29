@@ -12,31 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package bgpd
+package bgpserver
 
 import (
-	"net"
+	"fmt"
 )
 
-// FakeBGPdConnector is for testing the controller.
-type FakeBGPdConnector struct {
-	// RouteConfigured checks whether the prefix is configured on the (fake) vtysh.
+type FakeBgpServerConnector struct {
 	RouteConfigured map[string]bool
 }
 
-// ConfigureRouteWithRouteMap implements vtysh.BGPdConnector
-func (c *FakeBGPdConnector) ConfigureRouteWithRouteMap(prefix net.IPNet, routeMap string) error {
-	c.RouteConfigured[prefix.String()] = true
+func NewFakeBgpServerConnector() Connector {
+	return &FakeBgpServerConnector{
+		RouteConfigured: make(map[string]bool),
+	}
+}
+
+func (bs *FakeBgpServerConnector) Start() error {
 	return nil
 }
 
-// ShowRoutesWithBGPCommunityList implements vtysh.BGPdConnector
-func (*FakeBGPdConnector) ShowRoutesWithBGPCommunityList(communityList string) (BGP, error) {
-	return BGP{}, nil
+func (bs *FakeBgpServerConnector) AddPath(prefix string, prefixLen uint32, _ string, _ uint32) error {
+	p := fmt.Sprintf("%s/%d", prefix, prefixLen)
+	bs.RouteConfigured[p] = true
+
+	return nil
 }
 
-func NewFakeBGPdConnector() BGPdConnector {
-	return &FakeBGPdConnector{
-		RouteConfigured: make(map[string]bool),
-	}
+func (bs *FakeBgpServerConnector) ListPath() ([]Route, error) {
+	return nil, nil
+}
+
+func (bs *FakeBgpServerConnector) Stop() {
 }
