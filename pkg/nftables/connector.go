@@ -16,10 +16,10 @@ package nftables
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/command"
-	"golang.org/x/exp/slog"
 )
 
 const (

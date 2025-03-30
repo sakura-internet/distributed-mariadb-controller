@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -35,14 +36,9 @@ import (
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/controller"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/nftables"
 	"github.com/vishvananda/netlink"
-
-	"golang.org/x/exp/rand"
-	"golang.org/x/exp/slog"
 )
 
 func main() {
-	rand.Seed(uint64(time.Now().UnixNano()))
-
 	if err := parseAllFlags(os.Args[1:]); err != nil {
 		panic(err)
 	}
@@ -255,7 +251,7 @@ func tryToGetTheExclusiveLockWithoutBlocking(path string) (*os.File, error) {
 
 // setupGlobalLogger setups a slog.Logger and sets it as the global logger of the slog packages.
 func setupGlobalLogger(w io.Writer, level string) *slog.Logger {
-	opts := slog.HandlerOptions{
+	opts := &slog.HandlerOptions{
 		AddSource: true,
 	}
 
@@ -270,7 +266,7 @@ func setupGlobalLogger(w io.Writer, level string) *slog.Logger {
 		opts.Level = slog.LevelError
 	}
 
-	return slog.New(opts.NewTextHandler(w))
+	return slog.New(slog.NewTextHandler(w, opts))
 }
 
 // readDBReplicaPassword reads the contents from db replica password file.

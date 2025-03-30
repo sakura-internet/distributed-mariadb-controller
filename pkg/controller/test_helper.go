@@ -15,17 +15,17 @@
 package controller
 
 import (
+	"log/slog"
 	"os"
 
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/frrouting/bgpd"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/mariadb"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/nftables"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/systemd"
-	"golang.org/x/exp/slog"
 )
 
 func _newFakeController() *Controller {
-	logger := slog.New(slog.NewJSONHandler(os.Stderr))
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{}))
 	c := NewController(
 		logger,
 		"dummy-global-interface-name",

@@ -16,12 +16,12 @@ package mariadb
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/command"
-	"golang.org/x/exp/slog"
 )
 
 const (

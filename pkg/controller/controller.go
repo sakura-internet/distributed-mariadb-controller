@@ -17,6 +17,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"net"
 	"sync"
@@ -27,7 +28,6 @@ import (
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/mariadb"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/nftables"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/systemd"
-	"golang.org/x/exp/slog"
 )
 
 // State specifies the controller state.
@@ -175,7 +175,7 @@ controllerLoop:
 			time.Sleep(time.Second * time.Duration(rand.Intn(2)+1))
 
 			if err := c.preDecideNextStateHandler(); err != nil {
-				c.logger.Error("preDecideNextStateHandler", err, "state", c.GetState())
+				c.logger.Error("preDecideNextStateHandler", "error", err, "state", string(c.GetState()))
 				// we urgently transition to fault state
 				c.forceTransitionToFault()
 				continue
@@ -185,7 +185,7 @@ controllerLoop:
 			c.logger.Debug("controller decided next state", "next state", nextState)
 
 			if err := c.onStateHandler(nextState); err != nil {
-				c.logger.Error("onStateHandler", err, "next state", nextState)
+				c.logger.Error("onStateHandler", "error", err, "next state", nextState)
 			}
 		}
 	}
@@ -227,7 +227,7 @@ func (c *Controller) decideNextState() State {
 func (c *Controller) onExit() error {
 	c.setState(StateFault)
 	if err := c.triggerRunOnStateChangesToFault(); err != nil {
-		c.logger.Info("failed to TriggerRunOnStateChanges while going to fault. Ignore errors.", err)
+		c.logger.Info("failed to TriggerRunOnStateChanges while going to fault. Ignore errors.", "error", err)
 	}
 
 	return nil
@@ -241,7 +241,7 @@ func (c *Controller) onStateHandler(nextState State) error {
 
 	if c.keepStateInPrevTransition() {
 		if err := c.triggerRunOnStateKeeps(); err != nil {
-			c.logger.Error("failed to triggerRunOnStateKeeps. transition to fault state and exit", err, "state", string(c.GetState()))
+			c.logger.Error("failed to triggerRunOnStateKeeps. transition to fault state and exit", "error", err, "state", string(c.GetState()))
 			c.forceTransitionToFault()
 			panic("urgently exit")
 		}
@@ -251,7 +251,7 @@ func (c *Controller) onStateHandler(nextState State) error {
 
 	if err := c.triggerRunOnStateChanges(); err != nil {
 		// we urgently transition to fault state
-		c.logger.Error("failed to TriggerRunOnStateChanges. transition to fault state.", err, "state", string(c.GetState()))
+		c.logger.Error("failed to TriggerRunOnStateChanges. transition to fault state.", "error", err, "state", string(c.GetState()))
 		c.forceTransitionToFault()
 	}
 
@@ -268,11 +268,9 @@ func (c *Controller) preDecideNextStateHandler() error {
 
 	c.currentNeighbors = c.extractNeighborAddresses(prefixes)
 	// to avoiding unnecessary calculation, we checks the logger's level.
-	if c.logger.Enabled(slog.LevelInfo) {
-		if prevNeighbors.different(c.currentNeighbors) {
-			addrs := c.currentNeighbors.neighborAddresses()
-			c.logger.Info("neighbor set is updated", "addresses", addrs)
-		}
+	if prevNeighbors.different(c.currentNeighbors) {
+		addrs := c.currentNeighbors.neighborAddresses()
+		c.logger.Info("neighbor set is updated", "addresses", addrs)
 	}
 
 	c.currentMariaDBHealth = c.checkMariaDBHealth()
@@ -359,7 +357,7 @@ func (c *Controller) forceTransitionToFault() {
 
 	c.setState(StateFault)
 	if err := c.triggerRunOnStateChanges(); err != nil {
-		c.logger.Info("failed to TriggerRunOnStateChanges while going to fault. Ignore errors.", err)
+		c.logger.Info("failed to TriggerRunOnStateChanges while going to fault. Ignore errors.", "error", err)
 	}
 }
 
@@ -438,7 +436,7 @@ func (c *Controller) collectStateCommunityRoutePrefixes() (map[State][]net.IP, e
 			//       but the net/netip package doesn't have the way to parse CIDR notation.
 			addr, _, err := net.ParseCIDR(routePrefix)
 			if err != nil {
-				c.logger.Error("failed to parse route prefix", err)
+				c.logger.Error("failed to parse route prefix", "error", err)
 			}
 
 			routes[state] = append(routes[state], addr)

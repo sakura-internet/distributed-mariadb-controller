@@ -17,12 +17,12 @@ package vtysh
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net"
 	"time"
 
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/command"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/frrouting/bgpd"
-	"golang.org/x/exp/slog"
 )
 
 var (
