@@ -21,38 +21,29 @@ import (
 )
 
 // neighbor is the BGP neighbor.
-type neighbor struct {
-	// address is the address of the BGP speaker.
-	// e.g., "192.168.0.1"
-	address string
-}
+type neighbor string
 
 // neighborSet holds the set of the BGP neighbors.
-type neighborSet struct {
-	// Neighbors is the set of the BGP neighbors.
-	neighborMatrix map[State][]neighbor
-}
+type neighborSet map[State][]neighbor
 
 // newNeighborSet initializes the empty NeighborSet.
-func newNeighborSet() *neighborSet {
-	return &neighborSet{
-		neighborMatrix: map[State][]neighbor{
-			StateFault:     make([]neighbor, 0),
-			StateCandidate: make([]neighbor, 0),
-			StatePrimary:   make([]neighbor, 0),
-			StateReplica:   make([]neighbor, 0),
-		},
+func newNeighborSet() neighborSet {
+	return neighborSet{
+		StateFault:     make([]neighbor, 0),
+		StateCandidate: make([]neighbor, 0),
+		StatePrimary:   make([]neighbor, 0),
+		StateReplica:   make([]neighbor, 0),
 	}
 }
 
 // different returns true if the n and other is differenct.
-func (n neighborSet) different(other *neighborSet) bool {
-	if len(n.neighborMatrix) != len(other.neighborMatrix) {
+func (n neighborSet) different(other neighborSet) bool {
+	if len(n) != len(other) {
 		return true
 	}
 
-	for k, nNeighbors := range n.neighborMatrix {
-		oNeighbors, ok := other.neighborMatrix[k]
+	for k, nNeighbors := range n {
+		oNeighbors, ok := other[k]
 		if !ok {
 			return true
 		}
@@ -69,10 +60,10 @@ func (n neighborSet) different(other *neighborSet) bool {
 func (n neighborSet) neighborAddresses() string {
 	addressesByState := []string{}
 
-	for state, neighbors := range n.neighborMatrix {
+	for state, neighbors := range n {
 		addrs := make([]string, len(neighbors))
 		for i, neighbor := range neighbors {
-			addrs[i] = neighbor.address
+			addrs[i] = string(neighbor)
 		}
 
 		addressesByState = append(addressesByState, fmt.Sprintf("%s: [%s]", state, strings.Join(addrs, ",")))
@@ -82,28 +73,28 @@ func (n neighborSet) neighborAddresses() string {
 }
 
 // primaryNodeExists returns true if the set contains primary-state node(s).
-func (n *neighborSet) primaryNodeExists() bool {
-	return len(n.neighborMatrix[StatePrimary]) != 0
+func (n neighborSet) primaryNodeExists() bool {
+	return len(n[StatePrimary]) != 0
 }
 
 // replicaNodeExists returns true if the set contains replica-state node(s).
-func (n *neighborSet) replicaNodeExists() bool {
-	return len(n.neighborMatrix[StateReplica]) != 0
+func (n neighborSet) replicaNodeExists() bool {
+	return len(n[StateReplica]) != 0
 }
 
 // candidateNodeExists returns true if the set contains candidate-state node(s).
-func (n *neighborSet) candidateNodeExists() bool {
-	return len(n.neighborMatrix[StateCandidate]) != 0
+func (n neighborSet) candidateNodeExists() bool {
+	return len(n[StateCandidate]) != 0
 }
 
 // faultNodeExists returns true if the set contains fault-state node(s).
-func (n *neighborSet) faultNodeExists() bool {
-	return len(n.neighborMatrix[StateFault]) != 0
+func (n neighborSet) faultNodeExists() bool {
+	return len(n[StateFault]) != 0
 }
 
 // anchorNodeExists returns true if the set contains anchor-mode node(s).
-func (n *neighborSet) anchorNodeExists() bool {
-	return len(n.neighborMatrix[StateAnchor]) != 0
+func (n neighborSet) anchorNodeExists() bool {
+	return len(n[StateAnchor]) != 0
 }
 
 // isNetworkParted returns true if there is no neighbor on the network.

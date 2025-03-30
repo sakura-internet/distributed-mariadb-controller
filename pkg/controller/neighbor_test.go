@@ -29,16 +29,16 @@ func TestDifferent_Same(t *testing.T) {
 func TestDifferent_DiffLen(t *testing.T) {
 	a := newNeighborSet()
 	b := newNeighborSet()
-	b.neighborMatrix[StateInitial] = append(b.neighborMatrix[StateInitial], neighbor{})
+	b[StateInitial] = []neighbor{""}
 	assert.True(t, a.different(b))
 }
 
 func TestDifferent_DiffNeigh(t *testing.T) {
 	a := newNeighborSet()
-	a.neighborMatrix[StateInitial] = append(a.neighborMatrix[StateInitial], neighbor{})
+	a[StateInitial] = []neighbor{""}
 
 	b := newNeighborSet()
-	b.neighborMatrix[StateInitial] = append(b.neighborMatrix[StateInitial], neighbor{address: "10.0.0.1"})
+	b[StateInitial] = []neighbor{"10.0.0.1"}
 	assert.True(t, a.different(b))
 
 }

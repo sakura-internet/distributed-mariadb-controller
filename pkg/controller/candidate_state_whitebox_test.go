@@ -31,7 +31,7 @@ func TestDecideNextStateOnCandidate_MariaDBIsUnhealthy(t *testing.T) {
 
 func TestDecideNextStateOnCandidate_InMultiCandidateSituation(t *testing.T) {
 	c := _newFakeController()
-	c.currentNeighbors.neighborMatrix[StateCandidate] = []neighbor{{}}
+	c.currentNeighbors[StateCandidate] = []neighbor{""}
 	c.currentMariaDBHealth = dbHealthCheckResultOK
 	c.readyToPrimary = readytoPrimaryJudgeNG
 
@@ -41,7 +41,7 @@ func TestDecideNextStateOnCandidate_InMultiCandidateSituation(t *testing.T) {
 
 func TestDecideNextStateOnCandidate_PrimaryIsAlreadyExist(t *testing.T) {
 	c := _newFakeController()
-	c.currentNeighbors.neighborMatrix[StatePrimary] = []neighbor{{}}
+	c.currentNeighbors[StatePrimary] = []neighbor{""}
 	c.currentMariaDBHealth = dbHealthCheckResultOK
 	c.readyToPrimary = readytoPrimaryJudgeNG
 
@@ -51,7 +51,7 @@ func TestDecideNextStateOnCandidate_PrimaryIsAlreadyExist(t *testing.T) {
 
 func TestDecideNextStateOnCandidate_ToBePromotedToPrimary(t *testing.T) {
 	c := _newFakeController()
-	c.currentNeighbors.neighborMatrix[StateFault] = []neighbor{{}}
+	c.currentNeighbors[StateFault] = []neighbor{""}
 	c.currentMariaDBHealth = dbHealthCheckResultOK
 	c.readyToPrimary = readytoPrimaryJudgeOK
 
@@ -61,7 +61,7 @@ func TestDecideNextStateOnCandidate_ToBePromotedToPrimary(t *testing.T) {
 
 func TestDecideNextStateCandidate_RemainCandidate(t *testing.T) {
 	c := _newFakeController()
-	c.currentNeighbors.neighborMatrix[StateFault] = []neighbor{{}}
+	c.currentNeighbors[StateFault] = []neighbor{""}
 	c.currentMariaDBHealth = dbHealthCheckResultOK
 	c.readyToPrimary = readytoPrimaryJudgeNG
 

@@ -34,7 +34,7 @@ func TestDecideNextStateOnReplica_MariaDBIsUnhealthy(t *testing.T) {
 
 func TestDecisionNextState_OnReplica_RemainReplica(t *testing.T) {
 	c := _newFakeController()
-	c.currentNeighbors.neighborMatrix[StatePrimary] = []neighbor{{}}
+	c.currentNeighbors[StatePrimary] = []neighbor{""}
 	c.currentMariaDBHealth = dbHealthCheckResultOK
 
 	nextState := c.decideNextStateOnReplica()
@@ -43,7 +43,7 @@ func TestDecisionNextState_OnReplica_RemainReplica(t *testing.T) {
 
 func TestDecisionNextState_OnReplica_NoOnePrimaryAndCandidate(t *testing.T) {
 	c := _newFakeController()
-	c.currentNeighbors.neighborMatrix[StateFault] = []neighbor{{}}
+	c.currentNeighbors[StateFault] = []neighbor{""}
 	c.currentMariaDBHealth = dbHealthCheckResultOK
 
 	nextState := c.decideNextStateOnReplica()
@@ -56,11 +56,9 @@ func TestTriggerRunOnStateChangesToReplica_OKPath(t *testing.T) {
 	// for checking the triggerRunOnStateChangesToReplica() resets this count to 0
 	c.replicationStatusCheckFailCount = 5
 
-	primaryNeighbor := neighbor{
-		address: "10.0.0.2",
-	}
+	primaryNeighbor := neighbor("10.0.0.2")
 	ns := newNeighborSet()
-	ns.neighborMatrix[StatePrimary] = append(ns.neighborMatrix[StatePrimary], primaryNeighbor)
+	ns[StatePrimary] = append(ns[StatePrimary], primaryNeighbor)
 	c.currentNeighbors = ns
 
 	err := c.triggerRunOnStateChangesToReplica()
@@ -71,7 +69,7 @@ func TestTriggerRunOnStateChangesToReplica_OKPath(t *testing.T) {
 	t.Run("TestTriggerRunOnStateChangesToReplica_OKPath_shouldResetReplicationStatusCheckCount", _shouldResetReplicationStatusCheckCount(c))
 	t.Run("TestTriggerRunOnStateChangesToReplica_OKPath_mustTurnOnMariaDBReadOnlyVariable", _mustTurnOnMariaDBReadOnlyVariable(fakeMariaDBConn))
 	t.Run("TestTriggerRunOnStateChangesToReplica_OKPath_shouldBeCorrectReplicationCommandsExecutionOrder", _shouldBeCorrectReplicationCommandsExecutionOrder(fakeMariaDBConn))
-	t.Run("TestTriggerRunOnStateChangesToReplica_OKPath_mustCallChangeMasterToWithCorrectArgs", _mustCallChangeMasterToWithCorrectArgs(fakeMariaDBConn, primaryNeighbor.address, "dummy-db-replica-password"))
+	t.Run("TestTriggerRunOnStateChangesToReplica_OKPath_mustCallChangeMasterToWithCorrectArgs", _mustCallChangeMasterToWithCorrectArgs(fakeMariaDBConn, string(primaryNeighbor), "dummy-db-replica-password"))
 
 	// test with Nftables Connector
 	fakeNftablesConn := c.nftablesConnector.(*nftables.FakeNftablesConnector)
@@ -89,7 +87,7 @@ func TestTriggerRunOnStateKeepsReplica_CheckReplicationStatusFailPath(t *testing
 
 	{
 		ns := newNeighborSet()
-		ns.neighborMatrix[StatePrimary] = append(ns.neighborMatrix[StatePrimary], neighbor{})
+		ns[StatePrimary] = []neighbor{""}
 		c.currentNeighbors = ns
 	}
 	err := c.triggerRunOnStateKeepsReplica()
@@ -113,7 +111,7 @@ func TestTriggerRunOnStateKeepsReplica_ReplicationStatusCheckCountOversThreshold
 
 	{
 		ns := newNeighborSet()
-		ns.neighborMatrix[StatePrimary] = append(ns.neighborMatrix[StatePrimary], neighbor{})
+		ns[StatePrimary] = []neighbor{""}
 		c.currentNeighbors = ns
 	}
 	err := c.triggerRunOnStateKeepsReplica()

@@ -31,7 +31,7 @@ func TestDecideNextStateOnPrimary_MariaDBIsUnhealthy(t *testing.T) {
 
 func TestDecideNextStateOnPrimary_InDualPrimarySituation(t *testing.T) {
 	c := _newFakeController()
-	c.currentNeighbors.neighborMatrix[StatePrimary] = []neighbor{{}}
+	c.currentNeighbors[StatePrimary] = []neighbor{""}
 	c.currentMariaDBHealth = dbHealthCheckResultOK
 
 	nextState := c.decideNextStateOnPrimary()
@@ -40,7 +40,7 @@ func TestDecideNextStateOnPrimary_InDualPrimarySituation(t *testing.T) {
 
 func TestDecideNextStateOnPrimary_OKPath(t *testing.T) {
 	c := _newFakeController()
-	c.currentNeighbors.neighborMatrix[StateReplica] = []neighbor{{}}
+	c.currentNeighbors[StateReplica] = []neighbor{""}
 	c.currentMariaDBHealth = dbHealthCheckResultOK
 
 	nextState := c.decideNextStateOnPrimary()

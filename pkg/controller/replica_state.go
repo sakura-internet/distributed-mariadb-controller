@@ -66,9 +66,9 @@ func (c *Controller) triggerRunOnStateChangesToReplica() error {
 		return err
 	}
 
-	primaryNode := c.currentNeighbors.neighborMatrix[StatePrimary][0]
+	primaryNode := c.currentNeighbors[StatePrimary][0]
 	master := mariadb.MasterInstance{
-		Host:     primaryNode.address,
+		Host:     string(primaryNode),
 		Port:     c.dbReplicaSourcePort,
 		User:     c.dbReplicaUserName,
 		Password: c.dbReplicaPassword,

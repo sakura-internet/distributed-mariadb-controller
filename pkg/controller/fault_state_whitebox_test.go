@@ -35,7 +35,7 @@ func TestTriggerRunOnStateChangesToFault_OKPath(t *testing.T) {
 
 func TestDecideNextStateOnFault_WithPrimaryNeighbors(t *testing.T) {
 	c := _newFakeController()
-	c.currentNeighbors.neighborMatrix[StatePrimary] = []neighbor{{}}
+	c.currentNeighbors[StatePrimary] = []neighbor{""}
 
 	nextState := c.decideNextStateOnFault()
 	assert.Equal(t, StateReplica, nextState)
@@ -43,7 +43,7 @@ func TestDecideNextStateOnFault_WithPrimaryNeighbors(t *testing.T) {
 
 func TestDecideNextStateOnFault_WithCandidateNeighbors(t *testing.T) {
 	c := _newFakeController()
-	c.currentNeighbors.neighborMatrix[StateCandidate] = []neighbor{{}}
+	c.currentNeighbors[StateCandidate] = []neighbor{""}
 
 	nextState := c.decideNextStateOnFault()
 	assert.Equal(t, StateFault, nextState)
@@ -51,7 +51,7 @@ func TestDecideNextStateOnFault_WithCandidateNeighbors(t *testing.T) {
 
 func TestDecideNextStateOnFault_WithReplicaNeighbors(t *testing.T) {
 	c := _newFakeController()
-	c.currentNeighbors.neighborMatrix[StateReplica] = []neighbor{{}}
+	c.currentNeighbors[StateReplica] = []neighbor{""}
 
 	nextState := c.decideNextStateOnFault()
 	assert.Equal(t, StateFault, nextState)
@@ -59,7 +59,7 @@ func TestDecideNextStateOnFault_WithReplicaNeighbors(t *testing.T) {
 
 func TestDecideNextStateOnFault_WithoutNeighbors(t *testing.T) {
 	c := _newFakeController()
-	c.currentNeighbors.neighborMatrix[StateFault] = []neighbor{{}}
+	c.currentNeighbors[StateFault] = []neighbor{""}
 
 	nextState := c.decideNextStateOnFault()
 	assert.Equal(t, StateCandidate, nextState)

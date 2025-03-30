@@ -101,7 +101,7 @@ type Controller struct {
 	writeTestDataFailCount uint
 	// currentNeighbors holds the current BGP neighbors of the dbserver.
 	// that discovered in each loop of the controller.
-	currentNeighbors *neighborSet
+	currentNeighbors neighborSet
 	// currentMariaDBHealth holds the most recent healthcheck's result.
 	currentMariaDBHealth dbHealthCheckResult
 	// readyToPrimary
@@ -449,7 +449,7 @@ func (c *Controller) collectStateCommunityRoutePrefixes() (map[State][]net.IP, e
 // ExtractNeighborAddresses get only the addresses of the neighbors from the given prefixes.
 func (c *Controller) extractNeighborAddresses(
 	prefixMatrix map[State][]net.IP,
-) *neighborSet {
+) neighborSet {
 	neighbors := newNeighborSet()
 
 	for state, prefixes := range prefixMatrix {
@@ -463,15 +463,13 @@ func (c *Controller) extractNeighborAddresses(
 				continue
 			}
 
-			if neighbors.neighborMatrix[state] == nil {
-				neighbors.neighborMatrix[state] = make([]neighbor, 0)
+			if neighbors[state] == nil {
+				neighbors[state] = make([]neighbor, 0)
 			}
 
-			neighbors.neighborMatrix[state] = append(
-				neighbors.neighborMatrix[state],
-				neighbor{
-					address: prefix.String(),
-				},
+			neighbors[state] = append(
+				neighbors[state],
+				neighbor(prefix.String()),
 			)
 		}
 	}
