@@ -98,7 +98,7 @@ func (n neighborSet) anchorNodeExists() bool {
 }
 
 // isNetworkParted returns true if there is no neighbor on the network.
-func (n *neighborSet) isNetworkParted() bool {
+func (n neighborSet) isNetworkParted() bool {
 	if n.primaryNodeExists() ||
 		n.candidateNodeExists() ||
 		n.replicaNodeExists() ||
