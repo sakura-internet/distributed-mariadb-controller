@@ -164,12 +164,11 @@ func (c *Controller) Start(
 	ticker := time.NewTicker(ctrlerLoopInterval)
 	defer ticker.Stop()
 
-controllerLoop:
 	for {
 		select {
 		case <-ctx.Done():
-			c.onExit()
-			break controllerLoop
+			c.forceTransitionToFault()
+			return
 		case <-ticker.C:
 			// random sleep to avoid global synchronization
 			time.Sleep(time.Second * time.Duration(rand.Intn(2)+1))
@@ -222,15 +221,6 @@ func (c *Controller) decideNextState() State {
 	default:
 		panic("unreachable")
 	}
-}
-
-func (c *Controller) onExit() error {
-	c.setState(StateFault)
-	if err := c.triggerRunOnStateChangesToFault(); err != nil {
-		c.logger.Info("failed to TriggerRunOnStateChanges while going to fault. Ignore errors.", "error", err)
-	}
-
-	return nil
 }
 
 func (c *Controller) onStateHandler(nextState State) error {
