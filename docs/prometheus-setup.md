@@ -123,5 +123,5 @@ systemctl start alertmanager
 
 以下の場合に通知を行うような設定となっていますので、通知が届くかどうか確認してください。
 
-- sakura-controllerデーモンがダウンしている場合(サーバがダウンしている状態も含む)
+- db-controllerデーモンがダウンしている場合(サーバがダウンしている状態も含む)
 - primary, replica以外の状態の場合
