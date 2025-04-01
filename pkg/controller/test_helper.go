@@ -28,17 +28,17 @@ func _newFakeController() *Controller {
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{}))
 	c := NewController(
 		logger,
-		"dummy-global-interface-name",
-		"10.0.0.1",
-		3306,
-		"repl",
-		"dummy-db-replica-password",
-		0,
-		"dummy-chain-name",
-		SystemdConnector(systemd.NewFakeSystemdConnector()),
-		MariaDBConnector(mariadb.NewFakeMariaDBConnector()),
-		NftablesConnector(nftables.NewFakeNftablesConnector()),
-		BGPdConnector(bgpd.NewFakeBGPdConnector()),
+		WithGlobalInterfaceName("dummy-global-interface-name"),
+		WithHostAddress("10.0.0.1"),
+		WithDBServingPort(3306),
+		WithDBReplicaUserName("repl"),
+		WithDBReplicaPassword("dummy-db-replica-password"),
+		WithDBReplicaSourcePort(0),
+		WithDBAclChainName("dummy-chain-name"),
+		WithSystemdConnector(systemd.NewFakeSystemdConnector()),
+		WithMariaDBConnector(mariadb.NewFakeMariaDBConnector()),
+		WithNftablesConnector(nftables.NewFakeNftablesConnector()),
+		WithBGPdConnector(bgpd.NewFakeBGPdConnector()),
 	)
 
 	return c

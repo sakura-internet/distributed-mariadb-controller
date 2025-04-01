@@ -80,13 +80,13 @@ func main() {
 
 	c := controller.NewController(
 		logger,
-		globalInterfaceNameFlag,
-		myHostAddress,
-		uint16(dbServingPortFlag),
-		dbReplicaUserNameFlag,
-		dbReplicaPassword,
-		uint16(dbReplicaSourcePortFlag),
-		chainNameForDBAclFlag,
+		controller.WithGlobalInterfaceName(globalInterfaceNameFlag),
+		controller.WithHostAddress(myHostAddress),
+		controller.WithDBServingPort(uint16(dbServingPortFlag)),
+		controller.WithDBReplicaUserName(dbReplicaUserNameFlag),
+		controller.WithDBReplicaPassword(dbReplicaPassword),
+		controller.WithDBReplicaSourcePort(uint16(dbReplicaSourcePortFlag)),
+		controller.WithDBAclChainName(chainNameForDBAclFlag),
 	)
 
 	// start goroutines

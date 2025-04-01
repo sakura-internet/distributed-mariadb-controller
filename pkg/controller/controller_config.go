@@ -24,28 +24,71 @@ import (
 // ControllerConfig is the configuration that is applied into Controller.
 type ControllerConfig func(c *Controller)
 
-// SystemdConnector generates a config that sets the systemd.Connector into Controller.
-func SystemdConnector(connector systemd.Connector) ControllerConfig {
+func WithGlobalInterfaceName(globalInterfaceName string) ControllerConfig {
+	return func(c *Controller) {
+		c.globalInterfaceName = globalInterfaceName
+	}
+}
+
+func WithHostAddress(hostAddress string) ControllerConfig {
+	return func(c *Controller) {
+		c.hostAddress = hostAddress
+	}
+}
+
+func WithDBServingPort(dbServingPort uint16) ControllerConfig {
+	return func(c *Controller) {
+		c.dbServingPort = dbServingPort
+	}
+}
+
+func WithDBReplicaUserName(dbReplicaUserName string) ControllerConfig {
+	return func(c *Controller) {
+		c.dbReplicaUserName = dbReplicaUserName
+	}
+}
+
+func WithDBReplicaPassword(dbReplicaPassword string) ControllerConfig {
+	return func(c *Controller) {
+		c.dbReplicaPassword = dbReplicaPassword
+	}
+}
+
+func WithDBReplicaSourcePort(dbReplicaSourcePort uint16) ControllerConfig {
+	return func(c *Controller) {
+		c.dbReplicaSourcePort = dbReplicaSourcePort
+	}
+}
+
+func WithDBAclChainName(dbAclChainName string) ControllerConfig {
+	return func(c *Controller) {
+		c.dbAclChainName = dbAclChainName
+	}
+}
+
+// WithSystemdConnector generates a config that sets the systemd.Connector into Controller.
+func WithSystemdConnector(connector systemd.Connector) ControllerConfig {
 	return func(c *Controller) {
 		c.systemdConnector = connector
 	}
 }
 
-func MariaDBConnector(connector mariadb.Connector) ControllerConfig {
+// WithMariaDBConnector generates a config that sets the mariadb.Connector into Controller.
+func WithMariaDBConnector(connector mariadb.Connector) ControllerConfig {
 	return func(c *Controller) {
 		c.mariaDBConnector = connector
 	}
 }
 
-// NftablesConnector generates a config that sets the nftables.Connector into Controller.
-func NftablesConnector(connector nftables.Connector) ControllerConfig {
+// WithNftablesConnector generates a config that sets the nftables.Connector into Controller.
+func WithNftablesConnector(connector nftables.Connector) ControllerConfig {
 	return func(c *Controller) {
 		c.nftablesConnector = connector
 	}
 }
 
-// BGPdConnector generates a config that sets the vtysh.BGPdConnector into Controller.
-func BGPdConnector(connector bgpd.BGPdConnector) ControllerConfig {
+// WithBGPdConnector generates a config that sets the vtysh.WithBGPdConnector into Controller.
+func WithBGPdConnector(connector bgpd.BGPdConnector) ControllerConfig {
 	return func(c *Controller) {
 		c.bgpdConnector = connector
 	}

@@ -119,24 +119,10 @@ type Controller struct {
 
 func NewController(
 	logger *slog.Logger,
-	globalInterfaceName string,
-	hostAddress string,
-	dbServingPort uint16,
-	dbReplicaUserName string,
-	dbReplicaPassword string,
-	dbReplicaSourcePort uint16,
-	dbAclChainName string,
 	configs ...ControllerConfig,
 ) *Controller {
 	c := &Controller{
-		logger:              logger,
-		globalInterfaceName: globalInterfaceName,
-		hostAddress:         hostAddress,
-		dbServingPort:       dbServingPort,
-		dbReplicaUserName:   dbReplicaUserName,
-		dbReplicaPassword:   dbReplicaPassword,
-		dbReplicaSourcePort: dbReplicaSourcePort,
-		dbAclChainName:      dbAclChainName,
+		logger: logger,
 
 		currentState:     StateInitial,
 		currentNeighbors: newNeighborSet(),
