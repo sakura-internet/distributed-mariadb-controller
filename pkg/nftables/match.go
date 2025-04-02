@@ -1,4 +1,4 @@
-// Copyright 2023 The distributed-mariadb-controller Authors
+// Copyright 2025 The distributed-mariadb-controller Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,18 +14,20 @@
 
 package nftables
 
-import "fmt"
+import (
+	"strconv"
+)
 
-type Match string
+type Match []string
 
 func IPSrcAddrMatch(srcAddr string) Match {
-	return Match(fmt.Sprintf("ip saddr %s", srcAddr))
+	return []string{"ip", "saddr", srcAddr}
 }
 
 func TCPDstPortMatch(dport uint16) Match {
-	return Match(fmt.Sprintf("tcp dport %d", dport))
+	return []string{"tcp", "dport", strconv.Itoa(int(dport))}
 }
 
 func IFNameMatch(ifname string) Match {
-	return Match(fmt.Sprintf("iifname \"%s\"", ifname))
+	return []string{"iifname", ifname}
 }

@@ -1,4 +1,4 @@
-// Copyright 2023 The distributed-mariadb-controller Authors
+// Copyright 2025 The distributed-mariadb-controller Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sakura
+package controller
 
 import (
-	"os"
 	"testing"
 
-	"github.com/sakura-internet/distributed-mariadb-controller/pkg/controller"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/systemd"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/exp/slog"
 )
 
 func TestTriggerRunOnStateChangesToFault_OKPath(t *testing.T) {
-	c := _newFakeSAKURAController()
+	c := _newFakeController()
 	err := c.triggerRunOnStateChangesToFault()
 	assert.NoError(t, err)
 
@@ -37,37 +34,33 @@ func TestTriggerRunOnStateChangesToFault_OKPath(t *testing.T) {
 }
 
 func TestDecideNextStateOnFault_WithPrimaryNeighbors(t *testing.T) {
-	ns := NewNeighborSet()
-	ns.NeighborMatrix[controller.StatePrimary] = append(ns.NeighborMatrix[controller.StatePrimary], Neighbor{})
+	c := _newFakeController()
+	c.currentNeighbors[StatePrimary] = []neighbor{""}
 
-	logger := slog.New(slog.NewJSONHandler(os.Stderr))
-	nextState := decideNextStateOnFault(logger, ns)
-	assert.Equal(t, controller.StateReplica, nextState)
+	nextState := c.decideNextStateOnFault()
+	assert.Equal(t, StateReplica, nextState)
 }
 
 func TestDecideNextStateOnFault_WithCandidateNeighbors(t *testing.T) {
-	ns := NewNeighborSet()
-	ns.NeighborMatrix[SAKURAControllerStateCandidate] = append(ns.NeighborMatrix[SAKURAControllerStateCandidate], Neighbor{})
+	c := _newFakeController()
+	c.currentNeighbors[StateCandidate] = []neighbor{""}
 
-	logger := slog.New(slog.NewJSONHandler(os.Stderr))
-	nextState := decideNextStateOnFault(logger, ns)
-	assert.Equal(t, controller.StateFault, nextState)
+	nextState := c.decideNextStateOnFault()
+	assert.Equal(t, StateFault, nextState)
 }
 
 func TestDecideNextStateOnFault_WithReplicaNeighbors(t *testing.T) {
-	ns := NewNeighborSet()
-	ns.NeighborMatrix[controller.StateReplica] = append(ns.NeighborMatrix[controller.StateReplica], Neighbor{})
+	c := _newFakeController()
+	c.currentNeighbors[StateReplica] = []neighbor{""}
 
-	logger := slog.New(slog.NewJSONHandler(os.Stderr))
-	nextState := decideNextStateOnFault(logger, ns)
-	assert.Equal(t, controller.StateFault, nextState)
+	nextState := c.decideNextStateOnFault()
+	assert.Equal(t, StateFault, nextState)
 }
 
 func TestDecideNextStateOnFault_WithoutNeighbors(t *testing.T) {
-	ns := NewNeighborSet()
-	ns.NeighborMatrix[controller.StateFault] = append(ns.NeighborMatrix[controller.StateFault], Neighbor{})
+	c := _newFakeController()
+	c.currentNeighbors[StateFault] = []neighbor{""}
 
-	logger := slog.New(slog.NewJSONHandler(os.Stderr))
-	nextState := decideNextStateOnFault(logger, ns)
-	assert.Equal(t, SAKURAControllerStateCandidate, nextState)
+	nextState := c.decideNextStateOnFault()
+	assert.Equal(t, StateCandidate, nextState)
 }

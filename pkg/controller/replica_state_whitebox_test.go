@@ -1,4 +1,4 @@
-// Copyright 2023 The distributed-mariadb-controller Authors
+// Copyright 2025 The distributed-mariadb-controller Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sakura
+package controller
 
 import (
-	"fmt"
 	"testing"
 
-	"github.com/sakura-internet/distributed-mariadb-controller/pkg/controller"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/frrouting/bgpd"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/mariadb"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/nftables"
@@ -27,39 +25,41 @@ import (
 )
 
 func TestDecideNextStateOnReplica_MariaDBIsUnhealthy(t *testing.T) {
-	ns := NewNeighborSet()
-	nextState := decideNextStateOnReplica(ns, MariaDBHealthCheckResultNG)
-	assert.Equal(t, controller.StateFault, nextState)
+	c := _newFakeController()
+	c.currentMariaDBHealth = dbHealthCheckResultNG
+
+	nextState := c.decideNextStateOnReplica()
+	assert.Equal(t, StateFault, nextState)
 }
 
 func TestDecisionNextState_OnReplica_RemainReplica(t *testing.T) {
-	ns := NewNeighborSet()
-	ns.NeighborMatrix[controller.StatePrimary] = append(ns.NeighborMatrix[controller.StatePrimary], Neighbor{})
+	c := _newFakeController()
+	c.currentNeighbors[StatePrimary] = []neighbor{""}
+	c.currentMariaDBHealth = dbHealthCheckResultOK
 
-	nextState := decideNextStateOnReplica(ns, MariaDBHealthCheckResultOK)
-	assert.Equal(t, controller.StateReplica, nextState)
+	nextState := c.decideNextStateOnReplica()
+	assert.Equal(t, StateReplica, nextState)
 }
 
 func TestDecisionNextState_OnReplica_NoOnePrimaryAndCandidate(t *testing.T) {
-	ns := NewNeighborSet()
-	ns.NeighborMatrix[controller.StateFault] = append(ns.NeighborMatrix[controller.StateFault], Neighbor{})
+	c := _newFakeController()
+	c.currentNeighbors[StateFault] = []neighbor{""}
+	c.currentMariaDBHealth = dbHealthCheckResultOK
 
-	nextState := decideNextStateOnReplica(ns, MariaDBHealthCheckResultOK)
-	assert.Equal(t, SAKURAControllerStateCandidate, nextState)
+	nextState := c.decideNextStateOnReplica()
+	assert.Equal(t, StateCandidate, nextState)
 }
 
 func TestTriggerRunOnStateChangesToReplica_OKPath(t *testing.T) {
-	c := _newFakeSAKURAController()
+	c := _newFakeController()
 
 	// for checking the triggerRunOnStateChangesToReplica() resets this count to 0
 	c.replicationStatusCheckFailCount = 5
 
-	primaryNeighbor := Neighbor{
-		Address: "10.0.0.2",
-	}
-	ns := NewNeighborSet()
-	ns.NeighborMatrix[controller.StatePrimary] = append(ns.NeighborMatrix[controller.StatePrimary], primaryNeighbor)
-	c.CurrentNeighbors = ns
+	primaryNeighbor := neighbor("10.0.0.2")
+	ns := newNeighborSet()
+	ns[StatePrimary] = append(ns[StatePrimary], primaryNeighbor)
+	c.currentNeighbors = ns
 
 	err := c.triggerRunOnStateChangesToReplica()
 	assert.NoError(t, err)
@@ -67,9 +67,9 @@ func TestTriggerRunOnStateChangesToReplica_OKPath(t *testing.T) {
 	// test with MariaDB Connector
 	fakeMariaDBConn := c.mariaDBConnector.(*mariadb.FakeMariaDBConnector)
 	t.Run("TestTriggerRunOnStateChangesToReplica_OKPath_shouldResetReplicationStatusCheckCount", _shouldResetReplicationStatusCheckCount(c))
-	t.Run("TestTriggerRunOnStateChangesToReplica_OKPath_mustTurnOnMariaDBReadOnlyVariable", _mustTurnOnMariaDBReadOnlyVairable(fakeMariaDBConn))
+	t.Run("TestTriggerRunOnStateChangesToReplica_OKPath_mustTurnOnMariaDBReadOnlyVariable", _mustTurnOnMariaDBReadOnlyVariable(fakeMariaDBConn))
 	t.Run("TestTriggerRunOnStateChangesToReplica_OKPath_shouldBeCorrectReplicationCommandsExecutionOrder", _shouldBeCorrectReplicationCommandsExecutionOrder(fakeMariaDBConn))
-	t.Run("TestTriggerRunOnStateChangesToReplica_OKPath_mustCallChangeMasterToWithCorrectArgs", _mustCallChangeMasterToWithCorrectArgs(fakeMariaDBConn, primaryNeighbor.Address, "dummy-db-replica-password"))
+	t.Run("TestTriggerRunOnStateChangesToReplica_OKPath_mustCallChangeMasterToWithCorrectArgs", _mustCallChangeMasterToWithCorrectArgs(fakeMariaDBConn, string(primaryNeighbor), "dummy-db-replica-password"))
 
 	// test with Nftables Connector
 	fakeNftablesConn := c.nftablesConnector.(*nftables.FakeNftablesConnector)
@@ -81,14 +81,14 @@ func TestTriggerRunOnStateChangesToReplica_OKPath(t *testing.T) {
 }
 
 func TestTriggerRunOnStateKeepsReplica_CheckReplicationStatusFailPath(t *testing.T) {
-	c := _newFakeSAKURAController()
+	c := _newFakeController()
 	// inject the mariadb connector that fails to check replication status.
 	c.mariaDBConnector = mariadb.NewFakeMariaDBFailedReplicationConnector()
 
 	{
-		ns := NewNeighborSet()
-		ns.NeighborMatrix[controller.StatePrimary] = append(ns.NeighborMatrix[controller.StatePrimary], Neighbor{})
-		c.CurrentNeighbors = ns
+		ns := newNeighborSet()
+		ns[StatePrimary] = []neighbor{""}
+		c.currentNeighbors = ns
 	}
 	err := c.triggerRunOnStateKeepsReplica()
 	assert.NoError(t, err)
@@ -103,22 +103,22 @@ func TestTriggerRunOnStateKeepsReplica_CheckReplicationStatusFailPath(t *testing
 }
 
 func TestTriggerRunOnStateKeepsReplica_ReplicationStatusCheckCountOversThreshold(t *testing.T) {
-	c := _newFakeSAKURAController()
+	c := _newFakeController()
 	// inject the mariadb connector that fails to check replication status.
 	c.mariaDBConnector = mariadb.NewFakeMariaDBFailedReplicationConnector()
 
 	c.replicationStatusCheckFailCount = replicationStatusCheckThreshold
 
 	{
-		ns := NewNeighborSet()
-		ns.NeighborMatrix[controller.StatePrimary] = append(ns.NeighborMatrix[controller.StatePrimary], Neighbor{})
-		c.CurrentNeighbors = ns
+		ns := newNeighborSet()
+		ns[StatePrimary] = []neighbor{""}
+		c.currentNeighbors = ns
 	}
 	err := c.triggerRunOnStateKeepsReplica()
 	assert.Error(t, err)
 }
 
-func _shouldResetReplicationStatusCheckCount(c *SAKURAController) func(*testing.T) {
+func _shouldResetReplicationStatusCheckCount(c *Controller) func(*testing.T) {
 	return func(t *testing.T) {
 		t.Parallel()
 
@@ -127,14 +127,14 @@ func _shouldResetReplicationStatusCheckCount(c *SAKURAController) func(*testing.
 	}
 }
 
-func _mustTurnOnMariaDBReadOnlyVairable(
+func _mustTurnOnMariaDBReadOnlyVariable(
 	conn *mariadb.FakeMariaDBConnector,
 ) func(*testing.T) {
 	return func(t *testing.T) {
 		t.Parallel()
 
 		// check whether the controller turn on the read_only variable
-		_, ok := conn.Timestamp[fmt.Sprintf("TurnOnBoolVariable(%s)", mariadb.ReadOnlyVariableName)]
+		_, ok := conn.Timestamp["TurnOnReadOnly"]
 		assert.True(t, ok)
 	}
 }
@@ -164,8 +164,9 @@ func _mustCallChangeMasterToWithCorrectArgs(
 
 		// check whether the ChangeMasterTo() is called with the properties of a primary neighbor.
 		// FakeMariaDBConnector holds the argument of ChangeMasterTo() to .MasterConfig directly.
+		expectedReplicaUserName := "repl"
 		assert.Equal(t, expectedPrimaryAddress, conn.MasterConfig.Host)
-		assert.Equal(t, mariaDBMasterDefaultUser, conn.MasterConfig.User)
+		assert.Equal(t, expectedReplicaUserName, conn.MasterConfig.User)
 		assert.Equal(t, expectedPassword, conn.MasterConfig.Password)
 		assert.Equal(t, mariadb.MasterUseGTIDValueCurrentPos, conn.MasterConfig.UseGTID)
 	}

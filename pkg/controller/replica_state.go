@@ -1,4 +1,4 @@
-// Copyright 2023 The distributed-mariadb-controller Authors
+// Copyright 2025 The distributed-mariadb-controller Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sakura
+package controller
 
 import (
 	"fmt"
 
-	"github.com/sakura-internet/distributed-mariadb-controller/pkg/controller"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/mariadb"
 )
 
@@ -25,40 +24,35 @@ const (
 	// replicationStatusCheckThreshold is a threshold.
 	// if the counter of the controller overs this, the controller goes panic.
 	replicationStatusCheckThreshold = 20
-
-	mariaDBMasterDefaultUser = "repl"
 )
 
 // decideNextStateOnReplica determines the next state on replica state.
-func decideNextStateOnReplica(
-	neighbors *NeighborSet,
-	mariaDBHealth MariaDBHealthCheckResult,
-) controller.State {
-	if mariaDBHealth == MariaDBHealthCheckResultNG {
-		return controller.StateFault
+func (c *Controller) decideNextStateOnReplica() State {
+	if c.currentMariaDBHealth == dbHealthCheckResultNG {
+		return StateFault
 	}
 
-	noPrimary := !neighbors.primaryNodeExists()
-	noCandidate := !neighbors.candidateNodeExists()
+	noPrimary := !c.currentNeighbors.primaryNodeExists()
+	noCandidate := !c.currentNeighbors.candidateNodeExists()
 	if noPrimary && noCandidate {
 		// you may be the next primary node!
-		return SAKURAControllerStateCandidate
+		return StateCandidate
 	}
 
-	return controller.StateReplica
+	return StateReplica
 }
 
 // triggerRunOnStateChangesToReplica transition to replica state in main loop.
-func (c *SAKURAController) triggerRunOnStateChangesToReplica() error {
-	// [STEP1]: START of setting MariaDB State.
+func (c *Controller) triggerRunOnStateChangesToReplica() error {
+	// [STEP1]: setting MariaDB State.
 	if err := c.startMariaDBService(); err != nil {
 		return err
 	}
-	if health := c.checkMariaDBHealth(); health == MariaDBHealthCheckResultNG {
+	if health := c.checkMariaDBHealth(); health == dbHealthCheckResultNG {
 		return fmt.Errorf("MariaDB instance is down")
 	}
 
-	if !c.CurrentNeighbors.primaryNodeExists() {
+	if !c.currentNeighbors.primaryNodeExists() {
 		return fmt.Errorf("there is no primary neighbor in replica mode")
 	}
 
@@ -72,12 +66,12 @@ func (c *SAKURAController) triggerRunOnStateChangesToReplica() error {
 		return err
 	}
 
-	primaryNode := c.CurrentNeighbors.NeighborMatrix[controller.StatePrimary][0]
+	primaryNode := c.currentNeighbors[StatePrimary][0]
 	master := mariadb.MasterInstance{
-		Host:     primaryNode.Address,
-		Port:     c.MariaDBReplicaSourcePort,
-		User:     mariaDBMasterDefaultUser,
-		Password: c.MariaDBReplicaPassword,
+		Host:     string(primaryNode),
+		Port:     c.dbReplicaSourcePort,
+		User:     c.dbReplicaUserName,
+		Password: c.dbReplicaPassword,
 		UseGTID:  mariadb.MasterUseGTIDValueCurrentPos,
 	}
 	if err := c.mariaDBConnector.ChangeMasterTo(master); err != nil {
@@ -87,28 +81,25 @@ func (c *SAKURAController) triggerRunOnStateChangesToReplica() error {
 	if err := c.mariaDBConnector.StartReplica(); err != nil {
 		return err
 	}
-	// [STEP1]: END of setting MariaDB State.
 
-	// [STEP2]: START of setting Nftables State.
-	if err := c.rejectTCP3306TrafficFromExternal(); err != nil {
+	// [STEP2]: setting Nftables State.
+	if err := c.rejectDatabaseServiceTraffic(); err != nil {
 		return err
 	}
-	// [STEP2]: END of setting Nftables State.
 
-	// [STEP3]: START of configurating frrouting.
+	// [STEP3]: configurating frrouting.
 	if err := c.advertiseSelfNetIFAddress(); err != nil {
 		return err
 	}
-	// [STEP3]: END of configurating frrouting.
 
 	// reset the count because the controller is healthy for replica mode.
 	c.replicationStatusCheckFailCount = 0
 
-	c.Logger.Info("replica state handler succeed")
+	c.logger.Info("replica state handler succeed")
 	return nil
 }
 
-func (c *SAKURAController) triggerRunOnStateKeepsReplica() error {
+func (c *Controller) triggerRunOnStateKeepsReplica() error {
 	if c.replicationStatusCheckFailCount >= replicationStatusCheckThreshold {
 		// we should manually operate the case for recovering.
 		return fmt.Errorf("reached the maximum retry limit for replication")
@@ -117,22 +108,25 @@ func (c *SAKURAController) triggerRunOnStateKeepsReplica() error {
 	if err := c.checkMariaDBReplicationStatus(); err != nil {
 		// we should keep trying to challenge that the replication status satisfies our conditions.
 		c.replicationStatusCheckFailCount++
-		c.Logger.Warn("failed to satisfy replication conditions", "error", err, "replicationCount", c.replicationStatusCheckFailCount)
+		c.logger.Warn("failed to satisfy replication conditions", "error", err, "replicationCount", c.replicationStatusCheckFailCount)
 
 		if err := c.restartMariaDBReplica(); err != nil {
-			c.Logger.Warn("failed to restart replica", "error", err)
+			c.logger.Warn("failed to restart replica", "error", err)
 		}
-	} else {
-		// reset the count because the controller is healthy.
-		c.replicationStatusCheckFailCount = 0
+
+		// return noerror because this is soft fail
+		return nil
 	}
+
+	// reset the count because the controller is healthy.
+	c.replicationStatusCheckFailCount = 0
 
 	return nil
 }
 
 // checkMariaDBReplicationStatus returns true if the status of replication is satisfied.
 // if the challenge failed to satisfy the conditions, this function returns false.
-func (c *SAKURAController) checkMariaDBReplicationStatus() error {
+func (c *Controller) checkMariaDBReplicationStatus() error {
 	status, err := c.mariaDBConnector.ShowReplicationStatus()
 	if err != nil {
 		return err
@@ -142,13 +136,11 @@ func (c *SAKURAController) checkMariaDBReplicationStatus() error {
 		return fmt.Errorf("failed to satisfy the replication conditions")
 	}
 
-	// lastNotifiedReplicationDelay := time.Unix(0, 0)
-	// c.validateReplicationDelaySeconds(replicaStatus, lastNotifiedReplicationDelay)
 	return nil
 }
 
 // checkRequiredReplicationStatusIsOK checks the replication status satisfies the required conditions.
-func (c *SAKURAController) checkRequiredReplicationStatusIsOK(status mariadb.ReplicationStatus) bool {
+func (c *Controller) checkRequiredReplicationStatusIsOK(status mariadb.ReplicationStatus) bool {
 	ioRunning, ok1 := status[mariadb.ReplicationStatusSlaveIORunning]
 	sqlRunning, ok2 := status[mariadb.ReplicationStatusSlaveSQLRunning]
 
@@ -156,26 +148,26 @@ func (c *SAKURAController) checkRequiredReplicationStatusIsOK(status mariadb.Rep
 		msg := fmt.Sprintf("failed to retrieve %s or %s",
 			mariadb.ReplicationStatusSlaveIORunning,
 			mariadb.ReplicationStatusSlaveSQLRunning)
-		c.Logger.Debug(msg)
+		c.logger.Debug(msg)
 		return false
 	}
 
 	if ioRunning != mariadb.ReplicationStatusSlaveIORunningYes {
 		msg := fmt.Sprintf("unexpected %s status", mariadb.ReplicationStatusSlaveIORunning)
-		c.Logger.Debug(msg, "expected", "Yes", "actual", ioRunning)
+		c.logger.Debug(msg, "expected", "Yes", "actual", ioRunning)
 		return false
 	}
 
 	if sqlRunning != mariadb.ReplicationStatusSlaveSQLRunningYes {
 		msg := fmt.Sprintf("unexpected %s status", mariadb.ReplicationStatusSlaveSQLRunning)
-		c.Logger.Debug(msg, "expected", "Yes", "actual", sqlRunning)
+		c.logger.Debug(msg, "expected", "Yes", "actual", sqlRunning)
 		return false
 	}
 
 	return true
 }
 
-func (c *SAKURAController) restartMariaDBReplica() error {
+func (c *Controller) restartMariaDBReplica() error {
 	if err := c.mariaDBConnector.StopReplica(); err != nil {
 		return err
 	}

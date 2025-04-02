@@ -1,4 +1,4 @@
-// Copyright 2023 The distributed-mariadb-controller Authors
+// Copyright 2025 The distributed-mariadb-controller Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,8 +26,8 @@ func (c *FakeMariaDBFailedReplicationConnector) ChangeMasterTo(master MasterInst
 	return nil
 }
 
-// CheckBoolVariableIsON implements mariadb.Connector
-func (c *FakeMariaDBFailedReplicationConnector) CheckBoolVariableIsON(variableName string) bool {
+// IsReadOnly implements mariadb.Connector
+func (c *FakeMariaDBFailedReplicationConnector) IsReadOnly() bool {
 	return true
 }
 
@@ -56,13 +56,13 @@ func (c *FakeMariaDBFailedReplicationConnector) StopReplica() error {
 	return nil
 }
 
-// TurnOffBoolVariable implements mariadb.Connector
-func (c *FakeMariaDBFailedReplicationConnector) TurnOffBoolVariable(variableName string) error {
+// TurnOffReadOnly implements mariadb.Connector
+func (c *FakeMariaDBFailedReplicationConnector) TurnOffReadOnly() error {
 	return nil
 }
 
-// TurnOnBoolVariable implements mariadb.Connector
-func (c *FakeMariaDBFailedReplicationConnector) TurnOnBoolVariable(variableName string) error {
+// TurnOnReadOnly implements mariadb.Connector
+func (c *FakeMariaDBFailedReplicationConnector) TurnOnReadOnly() error {
 	return nil
 }
 
@@ -83,5 +83,15 @@ func (*FakeMariaDBFailedReplicationConnector) DeleteRecords(dbName string, table
 
 // InsertIDRecord implements mariadb.Connector
 func (*FakeMariaDBFailedReplicationConnector) InsertIDRecord(dbName string, tableName string, id int) error {
+	return nil
+}
+
+// RemoveMasterInfo implements mariadb.Connector
+func (*FakeMariaDBFailedReplicationConnector) RemoveMasterInfo() error {
+	return nil
+}
+
+// RemoveRelayInfo implements mariadb.Connector
+func (*FakeMariaDBFailedReplicationConnector) RemoveRelayInfo() error {
 	return nil
 }

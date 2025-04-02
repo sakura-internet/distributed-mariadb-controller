@@ -1,8 +1,5 @@
 .PHONY: all
-all: format test vet
-
-.PHONY: sakura-all
-sakura-all: all sakura-build
+all: format test vet build
 
 .PHONY: format
 format:
@@ -19,18 +16,18 @@ ci: format test vet
 vet:
 	go vet ./...
 
-.PHONY: sakura-build
-sakura-build:
-	go build -o bin/sakura-controller ./cmd/sakura-controller
+.PHONY: build
+build:
+	go build -o bin/db-controller ./cmd/db-controller
 
 .PHONY: check-license
 check-license:
-	go-licenses check ./cmd/sakura-controller
+	go-licenses check ./cmd/db-controller
 
 .PHONY: add-license
 add-license:
 	addlicense -c "The distributed-mariadb-controller Authors" .
-	go-licenses check ./cmd/sakura-controller
+	go-licenses check ./cmd/db-controller
 
 .PHONY: tool
 tool:

@@ -12,22 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package bgpd
+package controller
 
 import (
-	"net"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-// Connector is an interface that communicates with FRRouting BGPd.
-type BGPdConnector interface {
-	// ShowRoutesWithBGPCommunityList shows the routes that with the given bgp community-list.
-	ShowRoutesWithBGPCommunityList(
-		communityList string,
-	) (BGP, error)
+func TestDifferent_Same(t *testing.T) {
+	a := newNeighborSet()
+	b := newNeighborSet()
+	assert.False(t, a.different(b))
+}
 
-	// ConfigureRouteWithRouteMap configs the route-advertising with the given route-map.
-	ConfigureRouteWithRouteMap(
-		prefix net.IPNet,
-		routeMap string,
-	) error
+func TestDifferent_DiffLen(t *testing.T) {
+	a := newNeighborSet()
+	b := newNeighborSet()
+	b[StateInitial] = []neighbor{""}
+	assert.True(t, a.different(b))
+}
+
+func TestDifferent_DiffNeigh(t *testing.T) {
+	a := newNeighborSet()
+	a[StateInitial] = []neighbor{""}
+
+	b := newNeighborSet()
+	b[StateInitial] = []neighbor{"10.0.0.1"}
+	assert.True(t, a.different(b))
+
 }

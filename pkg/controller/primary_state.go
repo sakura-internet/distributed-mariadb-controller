@@ -1,4 +1,4 @@
-// Copyright 2023 The distributed-mariadb-controller Authors
+// Copyright 2025 The distributed-mariadb-controller Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sakura
+package controller
 
 import (
 	"fmt"
 
-	"github.com/sakura-internet/distributed-mariadb-controller/pkg/controller"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/nftables"
-	"golang.org/x/exp/slog"
 )
 
 const (
@@ -34,36 +32,32 @@ const (
 )
 
 // decideNextStateOnPrimary determines the next state on primary state
-func decideNextStateOnPrimary(
-	logger *slog.Logger,
-	neighbors *NeighborSet,
-	mariaDBHealth MariaDBHealthCheckResult,
-) controller.State {
-	if mariaDBHealth == MariaDBHealthCheckResultNG {
-		logger.Warn("MariaDB instance is down")
-		return controller.StateFault
+func (c *Controller) decideNextStateOnPrimary() State {
+	if c.currentMariaDBHealth == dbHealthCheckResultNG {
+		c.logger.Warn("MariaDB instance is down")
+		return StateFault
 	}
 
 	// found dual-primary situation.
-	if neighbors.primaryNodeExists() {
-		logger.Warn("dual primary detected")
-		return controller.StateFault
+	if c.currentNeighbors.primaryNodeExists() {
+		c.logger.Warn("dual primary detected")
+		return StateFault
 	}
 
 	// won't transition to other state.
-	return controller.StatePrimary
+	return StatePrimary
 }
 
 // triggerRunOnStateChangesToPrimary processes transition to primary state in main loop.
-func (c *SAKURAController) triggerRunOnStateChangesToPrimary() error {
-	if health := c.checkMariaDBHealth(); health == MariaDBHealthCheckResultNG {
+func (c *Controller) triggerRunOnStateChangesToPrimary() error {
+	if health := c.checkMariaDBHealth(); health == dbHealthCheckResultNG {
 		return fmt.Errorf("MariaDB instance is down")
 	}
-	if c.CurrentNeighbors.primaryNodeExists() {
+	if c.currentNeighbors.primaryNodeExists() {
 		return fmt.Errorf("dual primary detected")
 	}
 
-	// [STEP1]: START of setting MariaDB state
+	// [STEP1]: setting MariaDB state
 	if err := c.mariaDBConnector.StopReplica(); err != nil {
 		return err
 	}
@@ -73,56 +67,54 @@ func (c *SAKURAController) triggerRunOnStateChangesToPrimary() error {
 	if err := c.syncReadOnlyVariable( /* read_only=0 */ false); err != nil {
 		return err
 	}
-	// [STEP1]: END of setting MariaDB state
 
-	// [STEP2]: START of setting nftables state
-	if err := c.acceptTCP3306Traffic(); err != nil {
+	// [STEP2]: setting nftables state
+	if err := c.acceptDatabaseServiceTraffic(); err != nil {
 		return err
 	}
-	// [STEP2]: END of setting nftables state
 
-	// [STEP3]: START of configurating frrouting
+	// [STEP3]: configurating frrouting
 	if err := c.advertiseSelfNetIFAddress(); err != nil {
 		return err
 	}
-	// [STEP3]: END of configurating frrouting
 
 	// reset the count because the controller is healthy.
 	c.writeTestDataFailCount = 0
 
-	c.Logger.Info("primary state handler succeed")
+	c.logger.Info("primary state handler succeed")
 	return nil
 }
 
 // triggerRunOnStateKeepsPrimary is the handler that is triggered when the prev/current state is different.
-func (c *SAKURAController) triggerRunOnStateKeepsPrimary() error {
+func (c *Controller) triggerRunOnStateKeepsPrimary() error {
 	if c.writeTestDataFailCount >= writeTestDataFailCountThreshold {
 		return fmt.Errorf("reached the maximum fail count of write test data")
 	}
 
 	if err := c.writeTestDataToMariaDB(); err != nil {
 		c.writeTestDataFailCount++
-		c.Logger.Warn("failed to write test data to mariadb", "error", err, "failedCount", c.writeTestDataFailCount)
-	} else {
-		// reset the count because the controller is healthy.
-		c.writeTestDataFailCount = 0
+		c.logger.Warn("failed to write test data to mariadb", "error", err, "failedCount", c.writeTestDataFailCount)
+		// return noerror because this is soft fail
+		return nil
 	}
 
+	// reset the count because the controller is healthy.
+	c.writeTestDataFailCount = 0
 	return nil
 }
 
-// acceptTCP3306Traffic sets the rule that accepts the inbound communication.
-func (c *SAKURAController) acceptTCP3306Traffic() error {
-	if err := c.nftablesConnector.FlushChain(nftables.BuiltinTableFilter, nftablesMariaDBChain); err != nil {
+// acceptDatabaseServiceTraffic sets the rule that accepts the inbound communication.
+func (c *Controller) acceptDatabaseServiceTraffic() error {
+	if err := c.nftablesConnector.FlushChain(c.dbAclChainName); err != nil {
 		return err
 	}
 
 	acceptMatches := []nftables.Match{
-		nftables.IFNameMatch(mariaDBServerDefaultIFName),
-		nftables.TCPDstPortMatch(mariaDBServerDefaultPort),
+		nftables.IFNameMatch(c.globalInterfaceName),
+		nftables.TCPDstPortMatch(uint16(c.dbServingPort)),
 	}
 
-	if err := c.nftablesConnector.AddRule(nftables.BuiltinTableFilter, nftablesMariaDBChain, acceptMatches, nftables.AcceptStatement()); err != nil {
+	if err := c.nftablesConnector.AddRule(c.dbAclChainName, acceptMatches, nftables.AcceptStatement()); err != nil {
 		return err
 	}
 
@@ -130,7 +122,7 @@ func (c *SAKURAController) acceptTCP3306Traffic() error {
 }
 
 // writeTestDataToMariaDB tries to write the testdata to MariaDB.
-func (c *SAKURAController) writeTestDataToMariaDB() error {
+func (c *Controller) writeTestDataToMariaDB() error {
 	if err := c.createManagementDatabase(); err != nil {
 		return err
 	}
@@ -144,32 +136,28 @@ func (c *SAKURAController) writeTestDataToMariaDB() error {
 		return err
 	}
 
-	if err := c.systemdConnector.CheckServiceStatus("mariadb"); err != nil {
-		return err
-	}
-
 	return nil
 }
 
 // createManagementDatabase tries to create the management database.
 // if the management database is already exist, the function does nothing.
-func (c *SAKURAController) createManagementDatabase() error {
+func (c *Controller) createManagementDatabase() error {
 	return c.mariaDBConnector.CreateDatabase(managementDatabaseName)
 }
 
 // createManagementDatabase tries to create alive-check table on the management database.
 // if the alive-check table is already exist, the function does nothing.
-func (c *SAKURAController) createAliveCheckTableOnManagementDB() error {
+func (c *Controller) createAliveCheckTableOnManagementDB() error {
 	return c.mariaDBConnector.CreateIDTable(managementDatabaseName, aliveCheckTableName)
 }
 
 // insertTemporaryRecordToAliveCheck tries to insert temporary record to alive-check table.
-func (c *SAKURAController) insertTemporaryRecordToAliveCheck() error {
+func (c *Controller) insertTemporaryRecordToAliveCheck() error {
 	// id has no meaning.
 	return c.mariaDBConnector.InsertIDRecord(managementDatabaseName, aliveCheckTableName, 1)
 }
 
 // deleteTemporaryRecordOnAliveCheck tries to delete records on alive-check table.
-func (c *SAKURAController) deleteTemporaryRecordOnAliveCheck() error {
+func (c *Controller) deleteTemporaryRecordOnAliveCheck() error {
 	return c.mariaDBConnector.DeleteRecords(managementDatabaseName, aliveCheckTableName)
 }

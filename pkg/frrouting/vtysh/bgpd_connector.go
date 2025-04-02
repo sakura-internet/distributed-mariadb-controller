@@ -1,4 +1,4 @@
-// Copyright 2023 The distributed-mariadb-controller Authors
+// Copyright 2025 The distributed-mariadb-controller Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,55 +17,61 @@ package vtysh
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net"
+	"time"
 
-	"github.com/sakura-internet/distributed-mariadb-controller/pkg/bash"
+	"github.com/sakura-internet/distributed-mariadb-controller/pkg/command"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/frrouting/bgpd"
-	"golang.org/x/exp/slog"
 )
 
-func NewDefaultBGPdConnector(logger *slog.Logger) bgpd.BGPdConnector {
-	return &VtyshBGPdConnector{Logger: logger}
+var (
+	vtyshTimeout = 5 * time.Second
+)
+
+// vtyshBGPdConnector is a default implementation of BGPdConnector.
+// this impl uses "vtysh" commands to interact with frrouting bgpd.
+type vtyshBGPdConnector struct {
+	logger *slog.Logger
 }
 
-// VtyshBGPdConnector is a default implementation of BGPdConnector.
-// this impl uses "vtysh" commands to interact with frrouting bgpd.
-type VtyshBGPdConnector struct {
-	Logger *slog.Logger
+func NewDefaultBGPdConnector(logger *slog.Logger) bgpd.BGPdConnector {
+	return &vtyshBGPdConnector{logger: logger}
 }
 
 // ShowRoutesWithBGPCommunityList implements BGPdConnector
-func (c *VtyshBGPdConnector) ShowRoutesWithBGPCommunityList(
+func (c *vtyshBGPdConnector) ShowRoutesWithBGPCommunityList(
 	communityList string,
 ) (bgpd.BGP, error) {
 	bgp := bgpd.BGP{}
 
-	showCmd := fmt.Sprintf("show ip bgp community-list %s json", communityList)
-	cmd := fmt.Sprintf("vtysh -H /dev/null -c '%s'", showCmd)
+	name := "vtysh"
+	args := []string{"-H", "/dev/null", "-c", fmt.Sprintf("show ip bgp community-list %s json", communityList)}
 
-	c.Logger.Debug("execute command", "command", cmd, "callerFn", "ShowRoutesWithBGPCommunityList")
-	out, err := bash.RunCommand(cmd)
+	c.logger.Debug("execute command", "name", name, "args", args, "callerFn", "ShowRoutesWithBGPCommunityList")
+	out, err := command.RunWithTimeout(vtyshTimeout, name, args...)
 	if err != nil {
 		return bgp, fmt.Errorf("failed to show ip bgp community-list: %w", err)
 	}
 
 	if err := json.Unmarshal(out, &bgp); err != nil {
-		return bgp, fmt.Errorf("failed to unmarchal to bgpd.BGP: %w", err)
+		return bgp, fmt.Errorf("failed to unmarshal to bgpd.BGP: %w", err)
 	}
 
 	return bgp, nil
 }
 
 // ConfigureRouteWithRouteMap implements BGPdConnector
-func (c *VtyshBGPdConnector) ConfigureRouteWithRouteMap(
+func (c *vtyshBGPdConnector) ConfigureRouteWithRouteMap(
 	prefix net.IPNet,
 	routeMap string,
 ) error {
+	name := "vtysh"
 	configCommand := fmt.Sprintf("network %s route-map %s", prefix.String(), routeMap)
-	cmd := fmt.Sprintf("vtysh -H /dev/null -c 'conf t' -c 'router bgp' -c '%s'", configCommand)
+	args := []string{"-H", "/dev/null", "-c", "conf t", "-c", "router bgp", "-c", configCommand}
 
-	c.Logger.Info("execute command", "command", cmd, "callerFn", "ConfigureUnicastRouteWithRouteMap")
-	if _, err := bash.RunCommand(cmd); err != nil {
+	c.logger.Info("execute command", "name", name, "args", args, "callerFn", "ConfigureUnicastRouteWithRouteMap")
+	if _, err := command.RunWithTimeout(vtyshTimeout, name, args...); err != nil {
 		return fmt.Errorf("failed to advertise %s route: %w", prefix.String(), err)
 	}
 

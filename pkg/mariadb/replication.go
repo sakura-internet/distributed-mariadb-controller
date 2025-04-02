@@ -1,4 +1,4 @@
-// Copyright 2023 The distributed-mariadb-controller Authors
+// Copyright 2025 The distributed-mariadb-controller Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,15 +14,15 @@
 
 package mariadb
 
+type MasterUseGTIDValue string
+
 type MasterInstance struct {
 	Host     string
-	Port     int
+	Port     uint16
 	User     string
 	Password string
 	UseGTID  MasterUseGTIDValue
 }
-
-type MasterUseGTIDValue string
 
 const (
 	MasterUseGTIDValueCurrentPos MasterUseGTIDValue = "current_pos"
