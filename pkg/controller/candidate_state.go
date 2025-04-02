@@ -56,7 +56,7 @@ func (c *Controller) triggerRunOnStateChangesToCandidate() error {
 		return err
 	}
 
-	// [STEP3]: configurating frrouting.
+	// [STEP3]: configurating bgp route.
 	if err := c.advertiseSelfNetIFAddress(); err != nil {
 		return err
 	}

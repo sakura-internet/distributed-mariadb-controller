@@ -18,7 +18,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/sakura-internet/distributed-mariadb-controller/pkg/frrouting/bgpd"
+	"github.com/sakura-internet/distributed-mariadb-controller/pkg/bgpserver"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/mariadb"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/nftables"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/systemd"
@@ -38,7 +38,7 @@ func _newFakeController() *Controller {
 		WithSystemdConnector(systemd.NewFakeSystemdConnector()),
 		WithMariaDBConnector(mariadb.NewFakeMariaDBConnector()),
 		WithNftablesConnector(nftables.NewFakeNftablesConnector()),
-		WithBGPdConnector(bgpd.NewFakeBGPdConnector()),
+		WithBgpServerConnector(bgpserver.NewFakeBgpServerConnector()),
 	)
 
 	return c

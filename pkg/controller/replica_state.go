@@ -87,7 +87,7 @@ func (c *Controller) triggerRunOnStateChangesToReplica() error {
 		return err
 	}
 
-	// [STEP3]: configurating frrouting.
+	// [STEP3]: configure bgp route.
 	if err := c.advertiseSelfNetIFAddress(); err != nil {
 		return err
 	}

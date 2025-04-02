@@ -71,6 +71,7 @@ func TestDecideNextStateCandidate_RemainCandidate(t *testing.T) {
 
 func TestTriggerRunOnStateChangesToCandidate_OKPath(t *testing.T) {
 	c := _newFakeController()
+	c.setState(StateFault)
 
 	err := c.triggerRunOnStateChangesToCandidate()
 	assert.NoError(t, err)

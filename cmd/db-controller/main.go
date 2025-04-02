@@ -33,6 +33,7 @@ import (
 	"github.com/labstack/gommon/log"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	apiv0 "github.com/sakura-internet/distributed-mariadb-controller/cmd/db-controller/api/v0"
+	"github.com/sakura-internet/distributed-mariadb-controller/pkg/bgpserver"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/controller"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/nftables"
 	"github.com/vishvananda/netlink"
@@ -59,6 +60,8 @@ func main() {
 	}
 	defer lockf.Close()
 
+	logger.Info("Hello, Starting db-controller.")
+
 	// for controlling the traffics that they're to the DB server port.
 	// the function returns nil if the expected chain is already exist.
 	nftConnect := nftables.NewDefaultConnector(logger)
@@ -66,7 +69,7 @@ func main() {
 		panic(err)
 	}
 
-	// prepare controller instance
+	// get my global ip address
 	myHostAddress, err := getNetIFAddress(globalInterfaceNameFlag)
 	if err != nil {
 		panic(err)
@@ -78,6 +81,25 @@ func main() {
 		panic(err)
 	}
 
+	var bgpPeers []bgpserver.Peer
+	for v := range strings.SplitSeq(bgpPeerAddressesFlag, ",") {
+		bgpPeers = append(bgpPeers, bgpserver.Peer{
+			Neighbor:             v,
+			RemoteAS:             uint32(bgpAsNumberFlag),
+			RemotePort:           uint32(bgpServingPortFlag),
+			KeepaliveIntervalSec: uint64(bgpKeepaliveIntervalSecFlag),
+		})
+	}
+
+	bgpServerConnect := bgpserver.NewDefaultConnector(
+		logger,
+		bgpserver.WithAsn(uint32(bgpAsNumberFlag)),
+		bgpserver.WithRouterId(myHostAddress),
+		bgpserver.WithListenPort(int32(bgpServingPortFlag)),
+		bgpserver.WithGrpcPort(gobgpGrpcPortFlag),
+		bgpserver.WithPeers(bgpPeers),
+	)
+
 	c := controller.NewController(
 		logger,
 		controller.WithGlobalInterfaceName(globalInterfaceNameFlag),
@@ -87,6 +109,7 @@ func main() {
 		controller.WithDBReplicaPassword(dbReplicaPassword),
 		controller.WithDBReplicaSourcePort(uint16(dbReplicaSourcePortFlag)),
 		controller.WithDBAclChainName(chainNameForDBAclFlag),
+		controller.WithBgpServerConnector(bgpServerConnect),
 	)
 
 	// start goroutines
@@ -98,7 +121,10 @@ func main() {
 	wg.Add(1)
 	go func(ctx context.Context, wg *sync.WaitGroup, c *controller.Controller) {
 		defer wg.Done()
-		c.Start(ctx, time.Second*time.Duration(mainPollingSpanSecondFlag))
+		err := c.Start(ctx, time.Second*time.Duration(mainPollingSpanSecondFlag))
+		if err != nil {
+			panic(err)
+		}
 	}(ctx, wg, c)
 
 	if enablePrometheusExporterFlag {

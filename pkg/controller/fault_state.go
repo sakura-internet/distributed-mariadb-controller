@@ -38,7 +38,7 @@ func (c *Controller) decideNextStateOnFault() State {
 // triggerRunOnStateChangesToFault transition to fault state in main loop.
 // In fault state, the controller just reflect the fault state to external resources.
 func (c *Controller) triggerRunOnStateChangesToFault() error {
-	// [STEP1]: configurating frrouting
+	// [STEP1]: configure bgp route
 	if err := c.advertiseSelfNetIFAddress(); err != nil {
 		c.logger.Warn("failed to advertise self-address in BGP but ignored because i'm fault", "error", err)
 	}

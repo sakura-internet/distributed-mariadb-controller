@@ -71,6 +71,7 @@ func TestTriggerRunOnStateKeepsPrimary_WriteTestDataFailedCountOversThreshold(t 
 
 func TestTriggerRunOnStateChangesToPrimary_OKPath(t *testing.T) {
 	c := _newFakeController()
+	c.setState(StateCandidate)
 
 	// for checking the triggerRunOnStateChangesToPrimary() resets this count to 0
 	c.writeTestDataFailCount = 5
