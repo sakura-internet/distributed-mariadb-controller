@@ -17,7 +17,6 @@ package controller
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"math/rand"
 	"net/netip"
@@ -71,23 +70,23 @@ const (
 	readytoPrimaryJudgeNG
 )
 
-const (
-	bgpCommunity_Fault     = 65001<<16 | 1  // 65001:1
-	bgpCommunity_Candidate = 65001<<16 | 2  // 65001:2
-	bgpCommunity_Primary   = 65001<<16 | 3  // 65001:3
-	bgpCommunity_Replica   = 65001<<16 | 4  // 65001:4
-	bgpCommunity_Anchor    = 65001<<16 | 10 // 65001:10
+var (
+	bgpCommunity_Fault     = bgpserver.MustParseCommunity("65000:1")
+	bgpCommunity_Candidate = bgpserver.MustParseCommunity("65000:2")
+	bgpCommunity_Primary   = bgpserver.MustParseCommunity("65000:3")
+	bgpCommunity_Replica   = bgpserver.MustParseCommunity("65000:4")
+	bgpCommunity_Anchor    = bgpserver.MustParseCommunity("65000:10")
 )
 
 var (
-	bgpCommunityToState = map[uint32]State{
+	bgpCommunityToState = map[bgpserver.Community]State{
 		bgpCommunity_Fault:     StateFault,
 		bgpCommunity_Candidate: StateCandidate,
 		bgpCommunity_Primary:   StatePrimary,
 		bgpCommunity_Replica:   StateReplica,
 		bgpCommunity_Anchor:    StateAnchor,
 	}
-	stateToBgpCommunity = map[State]uint32{
+	stateToBgpCommunity = map[State]bgpserver.Community{
 		StateFault:     bgpCommunity_Fault,
 		StateCandidate: bgpCommunity_Candidate,
 		StatePrimary:   bgpCommunity_Primary,
@@ -274,21 +273,19 @@ func (c *Controller) preDecideNextStateHandler() error {
 
 	currentNeighbors := newNeighborSet()
 	for _, route := range routes {
-		// parse community
 		state, ok := bgpCommunityToState[route.Community]
 		if !ok {
-			return fmt.Errorf("unknown community: %s", bgpserver.EncodeCommunity(route.Community))
+			// ignore route with unknown community
+			slog.Warn("unknown community", "community", route.Community)
+			continue
 		}
 
-		// parse prefix
-		pr, err := netip.ParsePrefix(route.Prefix)
-		if err != nil {
-			return fmt.Errorf("invalid prefix: %s", route.Prefix)
+		if route.Prefix.Bits() != 32 {
+			// ignore route with unknown prefix length
+			slog.Warn("prefix length must be 32", "prefixlength", route.Prefix.Bits())
+			continue
 		}
-		if pr.Bits() != 32 {
-			return fmt.Errorf("prefix length must be 32, found %d", pr.Bits())
-		}
-		addr := pr.Addr().String()
+		addr := route.Prefix.Addr().String()
 
 		// skip self originated route
 		if addr == c.hostAddress {
@@ -379,8 +376,18 @@ func (c *Controller) advertiseSelfNetIFAddress() error {
 	if !ok {
 		return errors.New("unknown state")
 	}
-	c.logger.Info("advertising my host address", "hostaddress", c.hostAddress, "community", bgpserver.EncodeCommunity(comm))
-	return c.bgpServerConnector.AddPath(c.hostAddress, 32, c.hostAddress, comm)
+	addr, err := netip.ParseAddr(c.hostAddress)
+	if err != nil {
+		return err
+	}
+
+	prefix := netip.PrefixFrom(addr, 32)
+	c.logger.Info("advertising my host address", "prefix", prefix, "community", comm)
+	route := bgpserver.Route{
+		Prefix:    prefix,
+		Community: comm,
+	}
+	return c.bgpServerConnector.AddPath(route)
 }
 
 // forceTransitionToFault set state to fault and triggers fault handler

@@ -15,6 +15,7 @@
 package controller
 
 import (
+	"net/netip"
 	"testing"
 
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/bgpserver"
@@ -99,7 +100,8 @@ func TestTriggerRunOnStateKeepsReplica_CheckReplicationStatusFailPath(t *testing
 
 	// advertiseSelfNetIFAddress() must not be called
 	fakeBgpServerConnector := c.bgpServerConnector.(*bgpserver.FakeBgpServerConnector)
-	_, ok := fakeBgpServerConnector.RouteConfigured["10.0.0.1"]
+	prefix := netip.PrefixFrom(netip.MustParseAddr("10.0.0.1"), 32)
+	_, ok := fakeBgpServerConnector.RouteConfigured[prefix]
 	assert.False(t, ok)
 }
 

@@ -14,17 +14,15 @@
 
 package bgpserver
 
-import (
-	"fmt"
-)
+import "net/netip"
 
 type FakeBgpServerConnector struct {
-	RouteConfigured map[string]bool
+	RouteConfigured map[netip.Prefix]bool
 }
 
 func NewFakeBgpServerConnector() Connector {
 	return &FakeBgpServerConnector{
-		RouteConfigured: make(map[string]bool),
+		RouteConfigured: make(map[netip.Prefix]bool),
 	}
 }
 
@@ -32,9 +30,8 @@ func (bs *FakeBgpServerConnector) Start() error {
 	return nil
 }
 
-func (bs *FakeBgpServerConnector) AddPath(prefix string, prefixLen uint32, _ string, _ uint32) error {
-	p := fmt.Sprintf("%s/%d", prefix, prefixLen)
-	bs.RouteConfigured[p] = true
+func (bs *FakeBgpServerConnector) AddPath(route Route) error {
+	bs.RouteConfigured[route.Prefix] = true
 
 	return nil
 }

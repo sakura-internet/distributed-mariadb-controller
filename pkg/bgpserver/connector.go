@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/netip"
 
 	gobgpapi "github.com/osrg/gobgp/v3/api"
 	gobgpbgp "github.com/osrg/gobgp/v3/pkg/packet/bgp"
@@ -25,9 +26,14 @@ import (
 	apb "google.golang.org/protobuf/types/known/anypb"
 )
 
+const (
+	// set dummy nexthop to advertise route because nexthop is meaningless.
+	dummyBgpRouteNexthop = "192.0.2.1"
+)
+
 type Route struct {
-	Prefix    string
-	Community uint32
+	Prefix    netip.Prefix
+	Community Community
 }
 
 type Peer struct {
@@ -39,7 +45,7 @@ type Peer struct {
 
 type Connector interface {
 	Start() error
-	AddPath(prefix string, prefixLen uint32, nexthop string, community uint32) error
+	AddPath(Route) error
 	ListPath() ([]Route, error)
 	Stop()
 }
@@ -129,10 +135,10 @@ func (bs *bgpServerConnector) Start() error {
 					HoldTime:          peer.KeepaliveIntervalSec * 3,
 				},
 			},
-
-			// route reflector client is always on
-			RouteReflector: &gobgpapi.RouteReflector{
-				RouteReflectorClient: true,
+			// ebgp multihop is always enabled
+			EbgpMultihop: &gobgpapi.EbgpMultihop{
+				Enabled:     true,
+				MultihopTtl: 255,
 			},
 		}
 
@@ -150,10 +156,10 @@ func (bs *bgpServerConnector) Start() error {
 	return nil
 }
 
-func (bs *bgpServerConnector) AddPath(prefix string, prefixLen uint32, nexthop string, community uint32) error {
+func (bs *bgpServerConnector) AddPath(route Route) error {
 	nlri1, err := apb.New(&gobgpapi.IPAddressPrefix{
-		Prefix:    prefix,
-		PrefixLen: prefixLen,
+		Prefix:    route.Prefix.Addr().String(),
+		PrefixLen: uint32(route.Prefix.Bits()),
 	})
 	if err != nil {
 		return err
@@ -165,10 +171,12 @@ func (bs *bgpServerConnector) AddPath(prefix string, prefixLen uint32, nexthop s
 			Origin: uint32(gobgpbgp.BGP_ORIGIN_ATTR_TYPE_IGP),
 		})
 		attrNextHop, _ := apb.New(&gobgpapi.NextHopAttribute{
-			NextHop: nexthop,
+			NextHop: dummyBgpRouteNexthop,
 		})
 		attrCommunities, _ := apb.New(&gobgpapi.CommunitiesAttribute{
-			Communities: []uint32{community},
+			Communities: []uint32{
+				uint32(route.Community),
+			},
 		})
 		attrs = []*apb.Any{attrOrigin, attrNextHop, attrCommunities}
 	}
@@ -199,10 +207,16 @@ func (bs *bgpServerConnector) ListPath() ([]Route, error) {
 		},
 		EnableFiltered: true,
 	}, func(d *gobgpapi.Destination) {
+		prefix, err := netip.ParsePrefix(d.Prefix)
+		if err != nil {
+			slog.Warn("ListPath: failed to ParsePrefix", "prefix", d.Prefix)
+			return
+		}
 		for _, path := range d.Paths {
 			for _, attr := range path.GetPattrs() {
 				m, err := attr.UnmarshalNew()
 				if err != nil {
+					slog.Warn("ListPath: failed to attr.UnmarshalNew", "attr", attr)
 					return
 				}
 
@@ -213,8 +227,8 @@ func (bs *bgpServerConnector) ListPath() ([]Route, error) {
 
 				for _, comm := range ca.Communities {
 					routes = append(routes, Route{
-						Prefix:    d.Prefix,
-						Community: comm,
+						Prefix:    prefix,
+						Community: Community(comm),
 					})
 				}
 			}
@@ -229,13 +243,4 @@ func (bs *bgpServerConnector) ListPath() ([]Route, error) {
 
 func (bs *bgpServerConnector) Stop() {
 	bs.server.Stop()
-}
-
-// EncodeCommunity converts plain community value to human readable notation(for example 65001:10)
-func EncodeCommunity(comm uint32) string {
-	upper := comm >> 16
-	lower := comm & 0xffff
-	commDecoded := fmt.Sprintf("%d:%d", upper, lower)
-
-	return commDecoded
 }

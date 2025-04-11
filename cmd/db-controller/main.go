@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -82,10 +83,26 @@ func main() {
 	}
 
 	var bgpPeers []bgpserver.Peer
-	for v := range strings.SplitSeq(bgpPeerAddressesFlag, ",") {
+	{
+		asn, err := strconv.Atoi(bgpPeer1AsnFlag)
+		if err != nil {
+			panic("invalid bgp peer1 asn")
+		}
 		bgpPeers = append(bgpPeers, bgpserver.Peer{
-			Neighbor:             v,
-			RemoteAS:             uint32(bgpAsNumberFlag),
+			Neighbor:             bgpPeer1AddrFlag,
+			RemoteAS:             uint32(asn),
+			RemotePort:           uint32(bgpServingPortFlag),
+			KeepaliveIntervalSec: uint64(bgpKeepaliveIntervalSecFlag),
+		})
+	}
+	{
+		asn, err := strconv.Atoi(bgpPeer2AsnFlag)
+		if err != nil {
+			panic("invalid bgp peer2 asn")
+		}
+		bgpPeers = append(bgpPeers, bgpserver.Peer{
+			Neighbor:             bgpPeer2AddrFlag,
+			RemoteAS:             uint32(asn),
 			RemotePort:           uint32(bgpServingPortFlag),
 			KeepaliveIntervalSec: uint64(bgpKeepaliveIntervalSecFlag),
 		})
@@ -93,7 +110,7 @@ func main() {
 
 	bgpServerConnect := bgpserver.NewDefaultConnector(
 		logger,
-		bgpserver.WithAsn(uint32(bgpAsNumberFlag)),
+		bgpserver.WithAsn(uint32(bgpMyAsNumberFlag)),
 		bgpserver.WithRouterId(myHostAddress),
 		bgpserver.WithListenPort(int32(bgpServingPortFlag)),
 		bgpserver.WithGrpcPort(gobgpGrpcPortFlag),
