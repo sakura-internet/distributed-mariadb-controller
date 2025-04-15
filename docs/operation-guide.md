@@ -41,11 +41,11 @@ Sakura-DBCは、BGP経路のCommunity属性として表現することで、他�
 
 | 状態      | BGP Community |
 | --------- | ------------- |
-| fault     | 65001:1       |
-| candidate | 65001:2       |
-| primary   | 65001:3       |
-| replica   | 65001:4       |
-| anchor    | 65001:10      |
+| fault     | 65000:1       |
+| candidate | 65000:2       |
+| primary   | 65000:3       |
+| replica   | 65000:4       |
+| anchor    | 65000:10      |
 
 ## Sakura-DBCの起動
 
@@ -140,7 +140,7 @@ Peers 2, using 1449 KiB of memory
 
 Neighbor        V         AS   MsgRcvd   MsgSent   TblVer  InQ OutQ  Up/Down State/PfxRcd   PfxSnt Desc
 xx.xx.xx.xx     4      65001    228427    228427        0    0    0 01w0d22h            2        3 N/A
-xx.xx.xx.xx     4      65001    228427    228427        0    0    0 01w0d22h            2        3 N/A
+xx.xx.xx.xx     4      65002    228427    228427        0    0    0 01w0d22h            2        3 N/A
 
 Total number of neighbors 2
 ```
@@ -187,7 +187,7 @@ db-controllerがgobgpのgRPCポート(50051)を待ち受けており、そこか
 # gobgp neighbor
 Peer              AS  Up/Down State       |#Received  Accepted
 xx.xx.xx.xx 65001 00:30:02 Establ      |        1         1
-xx.xx.xx.xx 65001 00:31:05 Establ      |        3         2
+xx.xx.xx.xx 65002 00:31:05 Establ      |        3         2
 ```
 
 BGP経路情報を確認するには、以下のようにgobgpコマンドを用います。
@@ -195,11 +195,11 @@ BGP経路情報を確認するには、以下のようにgobgpコマンドを用
 ```
 # gobgp global rib
    Network              Next Hop             AS_PATH              Age        Attrs
-*> xx.xx.xx.xx/32    xx.xx.xx.xx                             00:34:41   [{Origin: i} {Communities: 65001:3}]
-*> xx.xx.xx.xx/32    xx.xx.xx.xx                             00:34:18   [{Origin: i} {LocalPref: 100} {Communities: 65001:4} {Originator: xx.xx.xx.xx} {ClusterList: [xx.xx.xx.xx]}]
-*  xx.xx.xx.xx/32    xx.xx.xx.xx                             00:34:35   [{Origin: i} {LocalPref: 100} {Communities: 65001:4} {Originator: xx.xx.xx.xx} {ClusterList: [xx.xx.xx.xx]}]
-*> xx.xx.xx.xx/32    xx.xx.xx.xx                             00:00:00   [{Origin: i} {Med: 0} {LocalPref: 100} {Communities: 65001:10} {Originator: xx.xx.xx.xx} {ClusterList: [xx.xx.xx.xx]}]
-*  xx.xx.xx.xx/32    xx.xx.xx.xx                             00:35:20   [{Origin: i} {Med: 0} {LocalPref: 100} {Communities: 65001:10}]
+*> xx.xx.xx.xx/32     xx.xx.xx.xx        65003                00:00:42   [{Origin: i} {Med: 0} {Communities: 65000:10}]
+*  xx.xx.xx.xx/32     xx.xx.xx.xx        65001 65003          00:00:38   [{Origin: i} {Communities: 65000:10}]
+*> xx.xx.xx.xx/32     xx.xx.xx.xx                             00:00:35   [{Origin: i} {Communities: 65000:4}]
+*> xx.xx.xx.xx/32     xx.xx.xx.xx              65001          00:00:38   [{Origin: i} {Communities: 65000:3}]
+*  xx.xx.xx.xx/32     xx.xx.xx.xx        65003 65001          00:00:39   [{Origin: i} {Communities: 65000:3}]
 ```
 
 ## ログレベルの変更方法

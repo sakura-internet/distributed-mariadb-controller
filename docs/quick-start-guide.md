@@ -68,8 +68,6 @@ Sakura-DBCは、以下のコンポーネントを利用します。
   ```
 - /etc/frr/daemons ファイルを作成します
   ```
-  # vi /etc/frr/daemons
-  ----
   bgpd=yes
   vtysh_enable=yes
   zebra_options="  -A 127.0.0.1 -s 90000000"
@@ -78,35 +76,58 @@ Sakura-DBCは、以下のコンポーネントを利用します。
   ```
 - /etc/frr/frr.conf ファイルを作成します
   ```
-  # vi /etc/frr/frr.conf
-  ----
   hostname test-server 【自身のホスト名を記入】
+  log stdout
   log syslog informational
   no ip forwarding
   no ipv6 forwarding
-  ip nht resolve-via-default
   bgp no-rib
   !
-  router bgp 65001
+  router bgp 65003
    bgp router-id xx.xx.xx.xx 【自身のIPアドレスを記入】
    bgp log-neighbor-changes
+   no bgp ebgp-requires-policy
+   bgp disable-ebgp-connected-route-check
    no bgp network import-check
    neighbor yy.yy.yy.yy remote-as 65001 【DBサーバ(1台目)のIPアドレスを記入】
    neighbor yy.yy.yy.yy timers 3 9
-   neighbor yy.yy.yy.yy route-reflector-client
-   neighbor zz.zz.zz.zz remote-as 65001 【DBサーバ(2台目)のIPアドレスを記入】
+   neighbor zz.zz.zz.zz remote-as 65002 【DBサーバ(2台目)のIPアドレスを記入】
    neighbor zz.zz.zz.zz timers 3 9
-   neighbor zz.zz.zz.zz route-reflector-client
-   network xx.xx.xx.xx/32 route-map anchor 【自身のIPアドレスを記入】
+   !
+   address-family ipv4 unicast
+    network xx.xx.xx.xx/32 route-map anchor 【自身のIPアドレスを記入】
+    neighbor yy.yy.yy.yy soft-reconfiguration inbound 【DBサーバ(1台目)のIPアドレスを記入】
+    neighbor zz.zz.zz.zz soft-reconfiguration inbound 【DBサーバ(2台目)のIPアドレスを記入】
+   exit-address-family
+  exit
   !
-  bgp community-list standard fault seq 5 permit 65001:1
-  bgp community-list standard candidate seq 5 permit 65001:2
-  bgp community-list standard primary seq 5 permit 65001:3
-  bgp community-list standard replica seq 5 permit 65001:4
-  bgp community-list standard anchor seq 5 permit 65001:10
+  bgp community-list standard anchor seq 5 permit 65000:10
+  bgp community-list standard candidate seq 5 permit 65000:2
+  bgp community-list standard fault seq 5 permit 65000:1
+  bgp community-list standard primary seq 5 permit 65000:3
+  bgp community-list standard replica seq 5 permit 65000:4
+  !
+  route-map fault permit 10
+   set community 65000:1
+  exit
+  !
+  route-map candidate permit 10
+   set community 65000:2
+  exit
+  !
+  route-map primary permit 10
+   set community 65000:3
+  exit
+  !
+  route-map replica permit 10
+   set community 65000:4
+  exit
   !
   route-map anchor permit 10
-   set community 65001:10
+   set community 65000:10
+  exit
+  !
+  ip nht resolve-via-default
   ```
 - FRRを起動します
   ```
@@ -126,8 +147,6 @@ Sakura-DBCは、以下のコンポーネントを利用します。
 
 - /etc/yum.repos.d/MariaDB.repo ファイルを作成します
   ```
-  # vi /etc/yum.repos.d/MariaDB.repo
-  ----
   [mariadb]
   name = MariaDB
   baseurl = https://rpm.mariadb.org/10.11/rhel/$releasever/$basearch
@@ -141,8 +160,6 @@ Sakura-DBCは、以下のコンポーネントを利用します。
   ```
 - /etc/my.cnf ファイルを作成します
   ```
-  # vi /etc/my.cnf
-  ----
   [mariadb]
   
   character_set_server = utf8mb4
@@ -234,15 +251,13 @@ Sakura-DBCは、以下のコンポーネントを利用します。
   注: コンパイルが成功すると、実行バイナリが `/root/distributed-mariadb-controller/bin/db-controller` に生成されます
 - /etc/systemd/system/db-controller.service ファイルを作成します
   ```
-  # vi /etc/systemd/system/db-controller.service
-  ----
   [Unit]
   Description=Database Controller
   After=network-online.target
   
   [Service]
   Type=simple
-  ExecStart=/root/distributed-mariadb-controller/bin/db-controller --log-level info --db-repilica-password-filepath /root/.db-replica-password --db-replica-source-port 13306 --bgp-peer-addresses=xx.xx.xx.xx,yy.yy.yy.yy 【アンカーともう一台のDBサーバのIPアドレスを記入】
+  ExecStart=/root/distributed-mariadb-controller/bin/db-controller --log-level info --db-repilica-password-filepath /root/.db-replica-password --db-replica-source-port 13306 --bgp-local-asn XXXX --bgp-peer1-addr xx.xx.xx.xx --bgp-peer1-asn XXXX --bgp-peer2-addr xx.xx.xx.xx --bgp-peer2-asn XXXX 【アンカーともう一台のDBサーバのIPアドレスとAS番号を記入】
   WorkingDirectory = /root/distributed-mariadb-controller
   
   [Install]
@@ -260,8 +275,8 @@ Sakura-DBCは、以下のコンポーネントを利用します。
 - gobgpをインストールします
   (db-controllerの動作上必要になるものではありませんが、CLIによりBGPの状態確認ができるためインストールを推奨します)
   ```
-  # wget https://github.com/osrg/gobgp/releases/download/v3.35.0/gobgp_3.35.0_linux_amd64.tar.gz
-  # tar -C /usr/local/bin -xzf gobgp_3.35.0_linux_amd64.tar.gz
+  # wget https://github.com/osrg/gobgp/releases/download/v3.35.0/gobgp_3.36.0_linux_amd64.tar.gz
+  # tar -C /usr/local/bin -xzf gobgp_3.36.0_linux_amd64.tar.gz
   ```
 
 ### 5. GSLBのセットアップ
