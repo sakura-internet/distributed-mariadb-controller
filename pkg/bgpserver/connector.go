@@ -53,7 +53,7 @@ type Connector interface {
 type bgpServerConnector struct {
 	logger     *slog.Logger
 	server     *gobgpserver.BgpServer
-	asn        uint32
+	localAsn   uint32
 	routerId   string
 	listenPort int32
 	grpcPort   int
@@ -74,9 +74,9 @@ func NewDefaultConnector(logger *slog.Logger, configs ...func(*bgpServerConnecto
 	return bs
 }
 
-func WithAsn(asn uint32) func(*bgpServerConnector) {
+func WithLocalAsn(localAsn uint32) func(*bgpServerConnector) {
 	return func(c *bgpServerConnector) {
-		c.asn = asn
+		c.localAsn = localAsn
 	}
 }
 
@@ -109,7 +109,7 @@ func (bs *bgpServerConnector) Start() error {
 
 	err := bs.server.StartBgp(context.Background(), &gobgpapi.StartBgpRequest{
 		Global: &gobgpapi.Global{
-			Asn:             bs.asn,
+			Asn:             bs.localAsn,
 			RouterId:        bs.routerId,
 			ListenAddresses: []string{"0.0.0.0"},
 			ListenPort:      bs.listenPort,
