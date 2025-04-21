@@ -354,7 +354,7 @@ func (c *Controller) getPreviousState() State {
 
 // checkMariaDBHealth checks whether the MariaDB server is healthy or not.
 func (c *Controller) checkMariaDBHealth() dbHealthCheckResult {
-	if err := c.systemdConnector.CheckServiceStatus(mariadb.SystemdSerivceName); err != nil {
+	if err := c.systemdConnector.CheckServiceStatus(mariadb.SystemdServiceName); err != nil {
 		c.logger.Debug("'systemctl status mariadb' exit with returning error", "error", err)
 		return dbHealthCheckResultNG
 	}
@@ -480,7 +480,7 @@ func (c *Controller) startMariaDBService() error {
 	if err := c.mariaDBConnector.RemoveRelayInfo(); err != nil {
 		return err
 	}
-	if err := c.systemdConnector.StartService(mariadb.SystemdSerivceName); err != nil {
+	if err := c.systemdConnector.StartService(mariadb.SystemdServiceName); err != nil {
 		return err
 	}
 

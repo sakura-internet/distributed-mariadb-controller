@@ -49,7 +49,7 @@ func (c *Controller) triggerRunOnStateChangesToFault() error {
 	}
 
 	// [STEP3]: setting MariaDB state
-	if err := c.systemdConnector.KillService(mariadb.SystemdSerivceName); err != nil {
+	if err := c.systemdConnector.KillService(mariadb.SystemdServiceName); err != nil {
 		c.logger.Warn("failed to kill db service but ignored because i'm fault", "error", err)
 	}
 	if err := c.stopMariaDBService(); err != nil {
@@ -85,7 +85,7 @@ func (c *Controller) rejectDatabaseServiceTraffic() error {
 
 // stopMariaDBService stops the mariadb's systemd service.
 func (c *Controller) stopMariaDBService() error {
-	if err := c.systemdConnector.StopService(mariadb.SystemdSerivceName); err != nil {
+	if err := c.systemdConnector.StopService(mariadb.SystemdServiceName); err != nil {
 		return err
 	}
 

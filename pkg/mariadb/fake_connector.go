@@ -42,7 +42,7 @@ func (c *FakeMariaDBConnector) ChangeMasterTo(master MasterInstance) error {
 
 // ResetAllReplicas implements mariadb.Connector
 func (c *FakeMariaDBConnector) ResetAllReplicas() error {
-	c.Timestamp["ResetAllRelicas"] = time.Now()
+	c.Timestamp["ResetAllReplicas"] = time.Now()
 	return nil
 }
 

@@ -15,7 +15,7 @@
 package mariadb
 
 const (
-	SystemdSerivceName = "mariadb"
+	SystemdServiceName = "mariadb"
 	MasterInfoFilePath = "/var/lib/mysql/master.info"
 	RelayInfoFilePath  = "/var/lib/mysql/relay-log.info"
 )
