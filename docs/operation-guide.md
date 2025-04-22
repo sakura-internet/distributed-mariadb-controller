@@ -61,7 +61,7 @@ Sakura-DBCを起動するには以下のようにコマンドを入力します�
     Tasks: 9 (limit: 24876)
    Memory: 5.5M
    CGroup: /system.slice/db-controller.service
-           └─1391344 /root/distributed-mariadb-controller/bin/db-controller --log-level info --db-repilica-password-filepath /root/.db-replica-password
+           └─1391344 /root/distributed-mariadb-controller/bin/db-controller --log-level info --db-replica-password-filepath /root/.db-replica-password
 <snip>
 ```
 
@@ -75,7 +75,7 @@ Sakura-DBCを停止するには以下のようにコマンドを入力します�
 ● sakura-controller.service - Database Controller
    Loaded: loaded (/etc/systemd/system/db-controller.service; enabled; vendor preset: disabled)
    Active: inactive (dead) since Thu 2023-07-13 16:55:35 JST; 7s ago
-  Process: 694 ExecStart=/root/distributed-mariadb-controller/bin/db-controller --log-level info --db-repilica-password-filepath /root/.db-replica-password (code=exited, status=0/SUCCESS)
+  Process: 694 ExecStart=/root/distributed-mariadb-controller/bin/db-controller --log-level info --db-replica-password-filepath /root/.db-replica-password (code=exited, status=0/SUCCESS)
  Main PID: 694 (code=exited, status=0/SUCCESS)
 <snip>
 ```

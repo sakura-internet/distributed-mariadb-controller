@@ -257,7 +257,7 @@ Sakura-DBCは、以下のコンポーネントを利用します。
   
   [Service]
   Type=simple
-  ExecStart=/root/distributed-mariadb-controller/bin/db-controller --log-level info --db-repilica-password-filepath /root/.db-replica-password --db-replica-source-port 13306 --bgp-local-asn XXXX --bgp-peer1-addr xx.xx.xx.xx --bgp-peer1-asn XXXX --bgp-peer2-addr xx.xx.xx.xx --bgp-peer2-asn XXXX 【アンカーともう一台のDBサーバのIPアドレスとAS番号を記入】
+  ExecStart=/root/distributed-mariadb-controller/bin/db-controller --log-level info --db-replica-password-filepath /root/.db-replica-password --db-replica-source-port 13306 --bgp-local-asn XXXX --bgp-peer1-addr xx.xx.xx.xx --bgp-peer1-asn XXXX --bgp-peer2-addr xx.xx.xx.xx --bgp-peer2-asn XXXX 【アンカーともう一台のDBサーバのIPアドレスとAS番号を記入】
   WorkingDirectory = /root/distributed-mariadb-controller
   
   [Install]
