@@ -71,27 +71,27 @@ const (
 )
 
 var (
-	bgpCommunity_Fault     = bgpserver.MustParseCommunity("65000:1")
-	bgpCommunity_Candidate = bgpserver.MustParseCommunity("65000:2")
-	bgpCommunity_Primary   = bgpserver.MustParseCommunity("65000:3")
-	bgpCommunity_Replica   = bgpserver.MustParseCommunity("65000:4")
-	bgpCommunity_Anchor    = bgpserver.MustParseCommunity("65000:10")
+	bgpCommunityFault     = bgpserver.MustParseCommunity("65000:1")
+	bgpCommunityCandidate = bgpserver.MustParseCommunity("65000:2")
+	bgpCommunityPrimary   = bgpserver.MustParseCommunity("65000:3")
+	bgpCommunityReplica   = bgpserver.MustParseCommunity("65000:4")
+	bgpCommunityAnchor    = bgpserver.MustParseCommunity("65000:10")
 )
 
 var (
 	bgpCommunityToState = map[bgpserver.Community]State{
-		bgpCommunity_Fault:     StateFault,
-		bgpCommunity_Candidate: StateCandidate,
-		bgpCommunity_Primary:   StatePrimary,
-		bgpCommunity_Replica:   StateReplica,
-		bgpCommunity_Anchor:    StateAnchor,
+		bgpCommunityFault:     StateFault,
+		bgpCommunityCandidate: StateCandidate,
+		bgpCommunityPrimary:   StatePrimary,
+		bgpCommunityReplica:   StateReplica,
+		bgpCommunityAnchor:    StateAnchor,
 	}
 	stateToBgpCommunity = map[State]bgpserver.Community{
-		StateFault:     bgpCommunity_Fault,
-		StateCandidate: bgpCommunity_Candidate,
-		StatePrimary:   bgpCommunity_Primary,
-		StateReplica:   bgpCommunity_Replica,
-		StateAnchor:    bgpCommunity_Anchor,
+		StateFault:     bgpCommunityFault,
+		StateCandidate: bgpCommunityCandidate,
+		StatePrimary:   bgpCommunityPrimary,
+		StateReplica:   bgpCommunityReplica,
+		StateAnchor:    bgpCommunityAnchor,
 	}
 )
 
