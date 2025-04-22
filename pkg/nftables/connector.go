@@ -83,7 +83,7 @@ func (c *nftCommandConnector) FlushChain(
 func (c *nftCommandConnector) CreateChain(
 	chain string,
 ) error {
-	// nft add chain comand returns ok if the chain is already exist.
+	// nft add chain command returns ok if the chain is already exist.
 	name := "nft"
 	args := []string{"add", "chain", builtinTableFilter, chain, "{ type filter hook input priority 0; }"}
 	c.logger.Info("execute command", "name", name, "args", args)

@@ -56,7 +56,7 @@ func parseAllFlags(args []string) error {
 
 	fs.StringVar(&logLevelFlag, "log-level", "warning", "the log level(debug/info/warning/error)")
 	fs.StringVar(&lockFilePathFlag, "lock-filepath", "/var/run/db-controller/lock", "the filepath of the exclusive lock")
-	fs.StringVar(&dbReplicaPasswordFilePathFlag, "db-repilica-password-filepath", "/var/run/db-controller/.db-replica-password", "the filepath of the DB replica password")
+	fs.StringVar(&dbReplicaPasswordFilePathFlag, "db-replica-password-filepath", "/var/run/db-controller/.db-replica-password", "the filepath of the DB replica password")
 	fs.StringVar(&globalInterfaceNameFlag, "global-interface-name", "eth0", "the interface name of global")
 	fs.StringVar(&chainNameForDBAclFlag, "chain-name-for-db-acl", "mariadb", "the chain name for DB access control")
 	fs.StringVar(&dbReplicaUserNameFlag, "db-replica-user-name", "repl", "the username for replication")

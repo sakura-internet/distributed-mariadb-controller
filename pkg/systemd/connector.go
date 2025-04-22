@@ -28,7 +28,7 @@ const (
 
 // Connector is an interface that communicates with systemd.
 type Connector interface {
-	// StartSerivce starts a systemd service.
+	// StartService starts a systemd service.
 	StartService(serviceName string) error
 
 	// StopService stops a systemd service.
@@ -51,7 +51,7 @@ func NewDefaultConnector(logger *slog.Logger) Connector {
 	return &systemCtlConnector{logger: logger}
 }
 
-// StartSerivce implements Connector
+// StartService implements Connector
 func (c *systemCtlConnector) StartService(
 	serviceName string,
 ) error {
