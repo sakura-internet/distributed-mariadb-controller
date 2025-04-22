@@ -135,7 +135,13 @@ func (bs *bgpServerConnector) Start() error {
 					HoldTime:          peer.KeepaliveIntervalSec * 3,
 				},
 			},
-			// ebgp multihop is always enabled
+			// eBGP Multihop is always enabled
+			// NOTE:
+			//   eBGP is used because gobgp's best path selection does not work properly for routes
+			//   received from the Route Reflector by an iBGP peer. (as of gobgp v3.36.0)
+			//   In an environment where db-controller is running, the anchor and each DB server are
+			//   placed in different segments, so eBGP multihop must be enabled so that peers can be
+			//   established across routers.
 			EbgpMultihop: &gobgpapi.EbgpMultihop{
 				Enabled:     true,
 				MultihopTtl: 255,
