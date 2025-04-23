@@ -37,32 +37,31 @@ Sakura-DBCは、内部的に以下の4つの状態を持ち、状況に応じて
 ## BGP経路の属性
 
 Sakura-DBCは、BGP経路のCommunity属性として表現することで、他のノードに自身の状態を広告します。
-
-vtyshコマンドを経由してFRRouting bgpdの設定を変更し、経路広告を行います。
+データベースサーバでは、デーモンとして起動するdb-controllerにgobgpが組み込まれており、BGPピアを確立します。
 
 | 状態      | BGP Community |
 | --------- | ------------- |
-| fault     | 65001:1       |
-| candidate | 65001:2       |
-| primary   | 65001:3       |
-| replica   | 65001:4       |
-| anchor    | 65001:10      |
+| fault     | 65000:1       |
+| candidate | 65000:2       |
+| primary   | 65000:3       |
+| replica   | 65000:4       |
+| anchor    | 65000:10      |
 
 ## Sakura-DBCの起動
 
 Sakura-DBCを起動するには以下のようにコマンドを入力します。
 
 ```
-[root@test-db1 ~]# systemctl start sakura-controller
-[root@test-db1 ~]# systemctl status sakura-controller
-● sakura-controller.service - Database Controller
-   Loaded: loaded (/etc/systemd/system/sakura-controller.service; enabled; vendor preset: disabled)
+# systemctl start db-controller
+# systemctl status db-controller
+● db-controller.service - Database Controller
+   Loaded: loaded (/etc/systemd/system/db-controller.service; enabled; vendor preset: disabled)
    Active: active (running) since Thu 2023-07-13 16:56:21 JST; 4s ago
- Main PID: 1391344 (sakura-controll)
+ Main PID: 1391344 (db-controller)
     Tasks: 9 (limit: 24876)
    Memory: 5.5M
-   CGroup: /system.slice/sakura-controller.service
-           └─1391344 /root/distributed-mariadb-controller/bin/sakura-controller --log-level info --db-repilica-password-filepath /root/.db-replica-password
+   CGroup: /system.slice/db-controller.service
+           └─1391344 /root/distributed-mariadb-controller/bin/db-controller --log-level info --db-replica-password-filepath /root/.db-replica-password
 <snip>
 ```
 
@@ -71,12 +70,12 @@ Sakura-DBCを起動するには以下のようにコマンドを入力します�
 Sakura-DBCを停止するには以下のようにコマンドを入力します。
 
 ```
-[root@test-db1 ~]# systemctl stop sakura-controller
-[root@test-db1 ~]# systemctl status sakura-controller
+# systemctl stop db-controller
+# systemctl status db-controller
 ● sakura-controller.service - Database Controller
-   Loaded: loaded (/etc/systemd/system/sakura-controller.service; enabled; vendor preset: disabled)
+   Loaded: loaded (/etc/systemd/system/db-controller.service; enabled; vendor preset: disabled)
    Active: inactive (dead) since Thu 2023-07-13 16:55:35 JST; 7s ago
-  Process: 694 ExecStart=/root/distributed-mariadb-controller/bin/sakura-controller --log-level info --db-repilica-password-filepath /root/.db-replica-password (code=exited, status=0/SUCCESS)
+  Process: 694 ExecStart=/root/distributed-mariadb-controller/bin/db-controller --log-level info --db-replica-password-filepath /root/.db-replica-password (code=exited, status=0/SUCCESS)
  Main PID: 694 (code=exited, status=0/SUCCESS)
 <snip>
 ```
@@ -86,7 +85,7 @@ Sakura-DBCを停止するには以下のようにコマンドを入力します�
 Sakura-DBCは、状態遷移や、それに伴い実行したコマンドなどをログ出力します。ログを確認するにはjournalctlコマンドを利用します。
 
 ```
-journalctl -u sakura-controller -e
+# journalctl -u db-controller -e
 ```
 
 ## 現在の内部状態の確認方法
@@ -94,7 +93,7 @@ journalctl -u sakura-controller -e
 Sakura-DBCの現在の状態を確認するには、curlコマンドなどで以下のエンドポイントをHTTPリクエストします。
 
 ```
-[root@test-db1 ~]# curl http://127.0.0.1:54545/status
+# curl http://127.0.0.1:54545/status
 {"state":"replica"}
 ```
 
@@ -104,7 +103,7 @@ Sakura-DBCがGSLBに対し、どのようにレスポンスを行っているか
 
 ```
 ! primaryの場合(200 OKが返る)
-[root@test-db2 ~]# curl -v http://127.0.0.1:54545/healthcheck
+# curl -v http://127.0.0.1:54545/healthcheck
 * Connected to 127.0.0.1 (127.0.0.1) port 54545 (#0)
 > GET /healthcheck HTTP/1.1
 > Host: 127.0.0.1:54545
@@ -114,7 +113,7 @@ Sakura-DBCがGSLBに対し、どのようにレスポンスを行っているか
 < Content-Length: 0
 
 ! primary以外の場合(503 Service Unavailableが返る)
-[root@test-db1 ~]# curl -v http://127.0.0.1:54545/healthcheck
+# curl -v http://127.0.0.1:54545/healthcheck
 * Connected to 127.0.0.1 (127.0.0.1) port 54545 (#0)
 > GET /healthcheck HTTP/1.1
 > Host: 127.0.0.1:54545
@@ -126,10 +125,12 @@ Sakura-DBCがGSLBに対し、どのようにレスポンスを行っているか
 
 ## BGP経路の確認方法
 
+### アンカーサーバ
+
 BGPピアの状態を確認するには、以下のようにvtyshコマンドを用います。
 
 ```
-[root@test-db1 ~]# vtysh -c 'show ip bgp summary'
+# vtysh -c 'show ip bgp summary'
 
 IPv4 Unicast Summary (VRF default):
 BGP router identifier xx.xx.xx.xx, local AS number 65001 vrf-id 0
@@ -139,7 +140,7 @@ Peers 2, using 1449 KiB of memory
 
 Neighbor        V         AS   MsgRcvd   MsgSent   TblVer  InQ OutQ  Up/Down State/PfxRcd   PfxSnt Desc
 xx.xx.xx.xx     4      65001    228427    228427        0    0    0 01w0d22h            2        3 N/A
-xx.xx.xx.xx     4      65001    228427    228427        0    0    0 01w0d22h            2        3 N/A
+xx.xx.xx.xx     4      65002    228427    228427        0    0    0 01w0d22h            2        3 N/A
 
 Total number of neighbors 2
 ```
@@ -147,7 +148,7 @@ Total number of neighbors 2
 BGP経路情報を確認するには、以下のようにvtyshコマンドを用います。
 
 ```
-[root@test-db1 ~]# vtysh -c 'show ip bgp'
+# vtysh -c 'show ip bgp'
 BGP table version is 4, local router ID is xx.xx.xx.xx, vrf id 0
 Default local pref 100, local AS 65001
 Status codes:  s suppressed, d damped, h history, * valid, > best, = multipath,
@@ -167,7 +168,7 @@ RPKI validation codes: V valid, I invalid, N Not found
 
 Displayed  3 routes and 5 total paths
 
-[root@test-db1 ~]# vtysh -c 'show ip bgp community-list primary'
+# vtysh -c 'show ip bgp community-list primary'
 <snip>
 
     Network          Next Hop            Metric LocPrf Weight Path
@@ -177,23 +178,47 @@ Displayed  3 routes and 5 total paths
 Displayed  1 routes and 5 total paths
 ```
 
+### DBサーバ
+
+BGPピアの状態を確認するには、以下のようにgobgpコマンドを用います。
+db-controllerがgobgpのgRPCポート(50051)を待ち受けており、そこから情報が取得されます。
+
+```
+# gobgp neighbor
+Peer              AS  Up/Down State       |#Received  Accepted
+xx.xx.xx.xx 65001 00:30:02 Establ      |        1         1
+xx.xx.xx.xx 65002 00:31:05 Establ      |        3         2
+```
+
+BGP経路情報を確認するには、以下のようにgobgpコマンドを用います。
+
+```
+# gobgp global rib
+   Network              Next Hop             AS_PATH              Age        Attrs
+*> xx.xx.xx.xx/32     xx.xx.xx.xx        65003                00:00:42   [{Origin: i} {Med: 0} {Communities: 65000:10}]
+*  xx.xx.xx.xx/32     xx.xx.xx.xx        65001 65003          00:00:38   [{Origin: i} {Communities: 65000:10}]
+*> xx.xx.xx.xx/32     xx.xx.xx.xx                             00:00:35   [{Origin: i} {Communities: 65000:4}]
+*> xx.xx.xx.xx/32     xx.xx.xx.xx              65001          00:00:38   [{Origin: i} {Communities: 65000:3}]
+*  xx.xx.xx.xx/32     xx.xx.xx.xx        65003 65001          00:00:39   [{Origin: i} {Communities: 65000:3}]
+```
+
 ## ログレベルの変更方法
 
 [クイックスタートガイド](quick-start-guide.md)の手順では、通常の運用において推奨されるinfoログレベルにて設定するようになっています。
 もし、ログレベルを変更するには、以下のようにします。
 
 ```
-vi /etc/systemd/system/sakura-controller.service
+# vi /etc/systemd/system/db-controller.service
 
-! infoになっている部分を変更します
-ExecStart = /root/distributed-mariadb-controller/bin/sakura-controller --log-level info --db-repilica-password-filepath /root/.db-replica-password
+! ログレベルを変更します(debugに変更する場合)
+ExecStart = /root/distributed-mariadb-controller/bin/db-controller --log-level debug ...
 ```
 
-systemdに反映し、Sakura-DBCを再起動します。
+systemdに反映し、db-controllerを再起動します。
 
 ```
-systemctl daemon-reload
-systemctl restart sakura-controller
+# systemctl daemon-reload
+# systemctl restart db-controller
 ```
 
 指定可能なログレベルと、各レベルにおいて出力されるログの基準は以下の通りです。

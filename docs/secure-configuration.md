@@ -14,12 +14,12 @@ Sakura-DBC、および関連ソフトウェアが利用するポート番号は�
 | ポート番号 | 利用するデーモン | 用途 | 制限するアクセス元 |
 | ---------- | ---------------- | ---- | ------------------ |
 | 22 | sshd | SSHリモートアクセス | SSHログインが必要なアクセス元 |
-| 179 | bgpd(FRRouting) | BGPピア | BGPピアを張る対向のデータベースサーバやアンカーサーバ |
-| 3306 | mariadbd | DBアクセス(MySQLプロトコル) | ※ sakura-controllerにて自動設定 |
-| 50505 | sakura-controller | Prometheus exporter | Metrics取集元であるPrometheusサーバ |
-| 54545 | sakura-controller | GSLBヘルスチェック | GSLBヘルスチェック元 |
+| 179 | bgpd(FRRouting) / db-controller(gobgp) | BGPピア | BGPピアを張る対向のデータベースサーバやアンカーサーバ |
+| 3306 | mariadbd | DBアクセス(MySQLプロトコル) | db-controllerにて自動設定 |
+| 50505 | db-controller | Prometheus exporter | Prometheusサーバ |
+| 54545 | db-controller | GSLBヘルスチェック | GSLBヘルスチェック元 |
 
-※ Sakura-DBCは、nftablesを用いて3306番ポートのアクセス許可/拒否ルールを設定します
+※ db-controllerは、nftablesを用いて3306番ポートのアクセス許可/拒否ルールを設定します
 
 ## nftablesの設定例
 
