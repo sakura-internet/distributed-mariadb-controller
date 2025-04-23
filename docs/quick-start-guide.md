@@ -275,7 +275,7 @@ Sakura-DBCは、以下のコンポーネントを利用します。
 - gobgpをインストールします
   (db-controllerの動作上必要になるものではありませんが、CLIによりBGPの状態確認ができるためインストールを推奨します)
   ```
-  # wget https://github.com/osrg/gobgp/releases/download/v3.35.0/gobgp_3.36.0_linux_amd64.tar.gz
+  # wget https://github.com/osrg/gobgp/releases/download/v3.36.0/gobgp_3.36.0_linux_amd64.tar.gz
   # tar -C /usr/local/bin -xzf gobgp_3.36.0_linux_amd64.tar.gz
   ```
 
