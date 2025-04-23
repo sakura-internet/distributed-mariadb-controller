@@ -34,6 +34,19 @@ var (
 	globalInterfaceNameFlag string
 	// chainNameForDBAclFlag is a cli-flag that specifies the nftables chain name for DB access control list.
 	chainNameForDBAclFlag string
+	// bgpLocalAsnFlag is a cli-flag that specifies the my as number
+	bgpLocalAsnFlag int
+	// bgpServingPortFlag is a cli-flag that specifies the port of bgp
+	bgpServingPortFlag int
+	// bgpKeepaliveIntervalSecFlag is a cli-flag that specifies the interval seconds of bgp keepalive
+	bgpKeepaliveIntervalSecFlag int
+	// bgpPeerXAddrFlag and bgpPeerXAsn is a cli-flag that specifies neighbor address and asn of bgp peer.
+	bgpPeer1AddrFlag string
+	bgpPeer1AsnFlag  int
+	bgpPeer2AddrFlag string
+	bgpPeer2AsnFlag  int
+	// gobgpGrpcPortFlag is a cli-flag that specifies port of gobgp gRPC
+	gobgpGrpcPortFlag int
 
 	// mainPollingSpanSecondFlag is a cli-flag that specifies the span seconds of the loop in main.go.
 	mainPollingSpanSecondFlag int
@@ -60,12 +73,20 @@ func parseAllFlags(args []string) error {
 	fs.StringVar(&globalInterfaceNameFlag, "global-interface-name", "eth0", "the interface name of global")
 	fs.StringVar(&chainNameForDBAclFlag, "chain-name-for-db-acl", "mariadb", "the chain name for DB access control")
 	fs.StringVar(&dbReplicaUserNameFlag, "db-replica-user-name", "repl", "the username for replication")
+	fs.StringVar(&bgpPeer1AddrFlag, "bgp-peer1-addr", "", "the address of bgp peer#1")
+	fs.StringVar(&bgpPeer2AddrFlag, "bgp-peer2-addr", "", "the address of bgp peer#2")
 
 	fs.IntVar(&mainPollingSpanSecondFlag, "main-polling-span-second", 4, "the span seconds of the loop in main.go")
 	fs.IntVar(&httpAPIServerPortFlag, "http-api-server-port", 54545, "the port the http api server listens")
 	fs.IntVar(&prometheusExporterPortFlag, "prometheus-exporter-port", 50505, "the port the prometheus exporter listens")
 	fs.IntVar(&dbReplicaSourcePortFlag, "db-replica-source-port", 13306, "the port of primary as replication source")
 	fs.IntVar(&dbServingPortFlag, "db-serving-port", 3306, "the port of database service")
+	fs.IntVar(&bgpLocalAsnFlag, "bgp-local-asn", 0, "the as number of local")
+	fs.IntVar(&bgpPeer1AsnFlag, "bgp-peer1-asn", 0, "the asn of bgp peer#1")
+	fs.IntVar(&bgpPeer2AsnFlag, "bgp-peer2-asn", 0, "the asn of bgp peer#2")
+	fs.IntVar(&bgpServingPortFlag, "bgp-serving-port", 179, "the port of bgp")
+	fs.IntVar(&bgpKeepaliveIntervalSecFlag, "bgp-keepalive-interval-sec", 3, "the interval seconds of bgp keepalive")
+	fs.IntVar(&gobgpGrpcPortFlag, "gobgp-grpc-port", 50051, "the listen port of gobgp gRPC")
 
 	fs.BoolVar(&enablePrometheusExporterFlag, "prometheus-exporter", true, "enables the prometheus exporter")
 	fs.BoolVar(&enableHTTPAPIFlag, "http-api", true, "enables the http api server")
@@ -81,6 +102,14 @@ func validateAllFlags() error {
 
 	if prometheusExporterPortFlag < 0 || 65535 < prometheusExporterPortFlag {
 		return fmt.Errorf("--prometheus-exporter-port must be the range of uint16(tcp port)")
+	}
+
+	if bgpLocalAsnFlag == 0 {
+		return fmt.Errorf("--bgp-local-asan must be specified")
+	}
+
+	if bgpPeer1AddrFlag == "" || bgpPeer1AsnFlag == 0 || bgpPeer2AddrFlag == "" || bgpPeer2AsnFlag == 0 {
+		return fmt.Errorf("insufficient bgp peer")
 	}
 
 	return nil

@@ -16,15 +16,15 @@ package controller
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log/slog"
 	"math/rand"
-	"net"
+	"net/netip"
+	"slices"
 	"sync"
 	"time"
 
-	"github.com/sakura-internet/distributed-mariadb-controller/pkg/frrouting/bgpd"
-	"github.com/sakura-internet/distributed-mariadb-controller/pkg/frrouting/vtysh"
+	"github.com/sakura-internet/distributed-mariadb-controller/pkg/bgpserver"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/mariadb"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/nftables"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/systemd"
@@ -70,6 +70,31 @@ const (
 	readytoPrimaryJudgeNG
 )
 
+var (
+	bgpCommunityFault     = bgpserver.MustParseCommunity("65000:1")
+	bgpCommunityCandidate = bgpserver.MustParseCommunity("65000:2")
+	bgpCommunityPrimary   = bgpserver.MustParseCommunity("65000:3")
+	bgpCommunityReplica   = bgpserver.MustParseCommunity("65000:4")
+	bgpCommunityAnchor    = bgpserver.MustParseCommunity("65000:10")
+)
+
+var (
+	bgpCommunityToState = map[bgpserver.Community]State{
+		bgpCommunityFault:     StateFault,
+		bgpCommunityCandidate: StateCandidate,
+		bgpCommunityPrimary:   StatePrimary,
+		bgpCommunityReplica:   StateReplica,
+		bgpCommunityAnchor:    StateAnchor,
+	}
+	stateToBgpCommunity = map[State]bgpserver.Community{
+		StateFault:     bgpCommunityFault,
+		StateCandidate: bgpCommunityCandidate,
+		StatePrimary:   bgpCommunityPrimary,
+		StateReplica:   bgpCommunityReplica,
+		StateAnchor:    bgpCommunityAnchor,
+	}
+)
+
 type Controller struct {
 	logger *slog.Logger
 	// globalInterfaceName is DB service interface name.
@@ -107,14 +132,14 @@ type Controller struct {
 	// readyToPrimary
 	readyToPrimary readyToPrimaryJudge
 
-	// nftablesConnector communicates with FRRouting BGPd via vtysh.
+	// nftablesConnector communicates with nftables.
 	nftablesConnector nftables.Connector
-	// bgpdConnector communicates with FRRouting BGPd via vtysh.
-	bgpdConnector bgpd.BGPdConnector
 	// systemdConnector manages the systemd services.
 	systemdConnector systemd.Connector
 	// mariaDBConnector communicates with MariaDB via mysql-client.
 	mariaDBConnector mariadb.Connector
+	// bgpServerConnector communicates with gobgp
+	bgpServerConnector bgpserver.Connector
 }
 
 func NewController(
@@ -127,10 +152,10 @@ func NewController(
 		currentState:     StateInitial,
 		currentNeighbors: newNeighborSet(),
 
-		nftablesConnector: nftables.NewDefaultConnector(logger),
-		bgpdConnector:     vtysh.NewDefaultBGPdConnector(logger),
-		mariaDBConnector:  mariadb.NewDefaultConnector(logger),
-		systemdConnector:  systemd.NewDefaultConnector(logger),
+		nftablesConnector:  nftables.NewDefaultConnector(logger),
+		mariaDBConnector:   mariadb.NewDefaultConnector(logger),
+		systemdConnector:   systemd.NewDefaultConnector(logger),
+		bgpServerConnector: bgpserver.NewDefaultConnector(logger),
 	}
 
 	for _, cfg := range configs {
@@ -144,8 +169,12 @@ func NewController(
 func (c *Controller) Start(
 	ctx context.Context,
 	ctrlerLoopInterval time.Duration,
-) {
-	c.logger.Info("Hello, Starting db-controller.")
+) error {
+	c.logger.Debug("controller: start bgpserver")
+	if err := c.bgpServerConnector.Start(); err != nil {
+		return err
+	}
+	defer c.bgpServerConnector.Stop()
 
 	ticker := time.NewTicker(ctrlerLoopInterval)
 	defer ticker.Stop()
@@ -154,7 +183,7 @@ func (c *Controller) Start(
 		select {
 		case <-ctx.Done():
 			c.forceTransitionToFault()
-			return
+			return nil
 		case <-ticker.C:
 			// random sleep to avoid global synchronization
 			time.Sleep(time.Second * time.Duration(rand.Intn(2)+1))
@@ -237,12 +266,38 @@ func (c *Controller) onStateHandler(nextState State) error {
 // preDecideNextStateHandler is triggered before calling MakeDecision()
 func (c *Controller) preDecideNextStateHandler() error {
 	prevNeighbors := c.currentNeighbors
-	prefixes, err := c.collectStateCommunityRoutePrefixes()
+	routes, err := c.bgpServerConnector.ListPath()
 	if err != nil {
-		return fmt.Errorf("failed to collect BGP routes: %w", err)
+		return err
 	}
 
-	c.currentNeighbors = c.extractNeighborAddresses(prefixes)
+	currentNeighbors := newNeighborSet()
+	for _, route := range routes {
+		state, ok := bgpCommunityToState[route.Community]
+		if !ok {
+			// ignore route with unknown community
+			slog.Warn("unknown community", "community", route.Community)
+			continue
+		}
+
+		if route.Prefix.Bits() != 32 {
+			// ignore route with unknown prefix length
+			slog.Warn("prefix length must be 32", "prefixlength", route.Prefix.Bits())
+			continue
+		}
+		addr := route.Prefix.Addr().String()
+
+		// skip self originated route
+		if addr == c.hostAddress {
+			continue
+		}
+
+		if !slices.Contains(currentNeighbors[state], neighbor(addr)) {
+			currentNeighbors[state] = append(currentNeighbors[state], neighbor(addr))
+		}
+	}
+	c.currentNeighbors = currentNeighbors
+
 	// to avoiding unnecessary calculation, we checks the logger's level.
 	if prevNeighbors.different(c.currentNeighbors) {
 		addrs := c.currentNeighbors.neighborAddresses()
@@ -317,11 +372,22 @@ func (c *Controller) triggerRunOnStateKeeps() error {
 // advertiseSelfNetIFAddress updates the configuration of the advertising route.
 // the BGP community of the advertising route will be updated with the current controller-state.
 func (c *Controller) advertiseSelfNetIFAddress() error {
-	_, selfAddr, err := net.ParseCIDR(c.hostAddress + "/32")
+	comm, ok := stateToBgpCommunity[c.GetState()]
+	if !ok {
+		return errors.New("unknown state")
+	}
+	addr, err := netip.ParseAddr(c.hostAddress)
 	if err != nil {
 		return err
 	}
-	return c.bgpdConnector.ConfigureRouteWithRouteMap(*selfAddr, string(c.GetState()))
+
+	prefix := netip.PrefixFrom(addr, 32)
+	c.logger.Info("advertising my host address", "prefix", prefix, "community", comm)
+	route := bgpserver.Route{
+		Prefix:    prefix,
+		Community: comm,
+	}
+	return c.bgpServerConnector.AddPath(route)
 }
 
 // forceTransitionToFault set state to fault and triggers fault handler
@@ -381,76 +447,6 @@ func (c *Controller) readyToBePromotedToPrimary() readyToPrimaryJudge {
 	}
 
 	return readytoPrimaryJudgeNG
-}
-
-// CollectStateCommunityRoutePrefixes collects the BGP route-prefix that they have a community of a controller-state.
-func (c *Controller) collectStateCommunityRoutePrefixes() (map[State][]net.IP, error) {
-	routes := make(map[State][]net.IP)
-
-	// StateInitial is not needed in the below slice because the state doesn't advertise any routes.
-	states := []State{
-		StateCandidate,
-		StateFault,
-		StatePrimary,
-		StateReplica,
-		StateAnchor,
-	}
-
-	for _, state := range states {
-		if routes[state] == nil {
-			routes[state] = make([]net.IP, 0)
-		}
-
-		bgp, err := c.bgpdConnector.ShowRoutesWithBGPCommunityList(string(state))
-		if err != nil {
-			return nil, err
-		}
-
-		for routePrefix := range bgp.Routes {
-			// NOTE: we recommend you use net/netip instead of net package
-			//       because the netip.Addr is the most prefered way to present an IP address in Go.
-			//       but the net/netip package doesn't have the way to parse CIDR notation.
-			addr, _, err := net.ParseCIDR(routePrefix)
-			if err != nil {
-				c.logger.Error("failed to parse route prefix", "error", err)
-			}
-
-			routes[state] = append(routes[state], addr)
-		}
-	}
-
-	return routes, nil
-}
-
-// ExtractNeighborAddresses get only the addresses of the neighbors from the given prefixes.
-func (c *Controller) extractNeighborAddresses(
-	prefixMatrix map[State][]net.IP,
-) neighborSet {
-	neighbors := newNeighborSet()
-
-	for state, prefixes := range prefixMatrix {
-
-		for _, prefix := range prefixes {
-
-			// each prefix of the advertised BGP route is the unicast address of other DB instances.
-			// if the route prefix(unicast IP) and my address are same,
-			// the route is advertised from me so it should be ignored.
-			if prefix.String() == c.hostAddress {
-				continue
-			}
-
-			if neighbors[state] == nil {
-				neighbors[state] = make([]neighbor, 0)
-			}
-
-			neighbors[state] = append(
-				neighbors[state],
-				neighbor(prefix.String()),
-			)
-		}
-	}
-
-	return neighbors
 }
 
 // syncReadOnlyVariable updates the read_only variable to the given expected value.

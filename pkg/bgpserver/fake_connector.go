@@ -12,22 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package bgpd
+package bgpserver
 
-import (
-	"net"
-)
+import "net/netip"
 
-// Connector is an interface that communicates with FRRouting BGPd.
-type BGPdConnector interface {
-	// ShowRoutesWithBGPCommunityList shows the routes that with the given bgp community-list.
-	ShowRoutesWithBGPCommunityList(
-		communityList string,
-	) (BGP, error)
+type FakeBgpServerConnector struct {
+	RouteConfigured map[netip.Prefix]bool
+}
 
-	// ConfigureRouteWithRouteMap configs the route-advertising with the given route-map.
-	ConfigureRouteWithRouteMap(
-		prefix net.IPNet,
-		routeMap string,
-	) error
+func NewFakeBgpServerConnector() Connector {
+	return &FakeBgpServerConnector{
+		RouteConfigured: make(map[netip.Prefix]bool),
+	}
+}
+
+func (bs *FakeBgpServerConnector) Start() error {
+	return nil
+}
+
+func (bs *FakeBgpServerConnector) AddPath(route Route) error {
+	bs.RouteConfigured[route.Prefix] = true
+
+	return nil
+}
+
+func (bs *FakeBgpServerConnector) ListPath() ([]Route, error) {
+	return nil, nil
+}
+
+func (bs *FakeBgpServerConnector) Stop() {
 }

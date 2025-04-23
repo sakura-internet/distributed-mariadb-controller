@@ -15,9 +15,10 @@
 package controller
 
 import (
+	"net/netip"
 	"testing"
 
-	"github.com/sakura-internet/distributed-mariadb-controller/pkg/frrouting/bgpd"
+	"github.com/sakura-internet/distributed-mariadb-controller/pkg/bgpserver"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/mariadb"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/nftables"
 	"github.com/sakura-internet/distributed-mariadb-controller/pkg/systemd"
@@ -52,6 +53,7 @@ func TestDecisionNextState_OnReplica_NoOnePrimaryAndCandidate(t *testing.T) {
 
 func TestTriggerRunOnStateChangesToReplica_OKPath(t *testing.T) {
 	c := _newFakeController()
+	c.setState(StateFault)
 
 	// for checking the triggerRunOnStateChangesToReplica() resets this count to 0
 	c.replicationStatusCheckFailCount = 5
@@ -97,8 +99,9 @@ func TestTriggerRunOnStateKeepsReplica_CheckReplicationStatusFailPath(t *testing
 	assert.Equal(t, uint(1), c.replicationStatusCheckFailCount)
 
 	// advertiseSelfNetIFAddress() must not be called
-	fakeBGPdConnector := c.bgpdConnector.(*bgpd.FakeBGPdConnector)
-	_, ok := fakeBGPdConnector.RouteConfigured["10.0.0.1"]
+	fakeBgpServerConnector := c.bgpServerConnector.(*bgpserver.FakeBgpServerConnector)
+	prefix := netip.PrefixFrom(netip.MustParseAddr("10.0.0.1"), 32)
+	_, ok := fakeBgpServerConnector.RouteConfigured[prefix]
 	assert.False(t, ok)
 }
 
